@@ -263,9 +263,9 @@ public class OnboardingActivity extends Screen implements Account.Listener {
         header(R.drawable.ms_forum, getString(R.string.onboarding_brain_title), getString(R.string.onboarding_brain_text), false);
         String cur = Prefs.agents(this);
         String[][] opts = {
+                {"opencode", "OpenCode", getString(R.string.onboarding_brain_opencode)},
                 {"claude", "Claude Code", getString(R.string.onboarding_brain_claude)},
                 {"codex", "Codex", getString(R.string.onboarding_brain_codex)},
-                {"opencode", "OpenCode", getString(R.string.onboarding_brain_opencode)},
                 {"agy", "Antigravity", getString(R.string.onboarding_brain_agy)},
                 {"grok", "Grok", getString(R.string.onboarding_brain_grok)},
                 {"both", "Claude Code + Codex", getString(R.string.onboarding_brain_both)},
@@ -292,7 +292,7 @@ public class OnboardingActivity extends Screen implements Account.Listener {
             t.setPaddingRelative(dp(this, 14), 0, dp(this, 8), 0);
             LinearLayout tr = row(this);
             tr.addView(title(this, o[1], 16));
-            if ("claude".equals(o[0])) {
+            if ("opencode".equals(o[0])) {
                 TextView tag = monoText(this, getString(R.string.onboarding_recommended), 11, ACCENT_TEXT);
                 tag.setPaddingRelative(dp(this, 6), dp(this, 1), dp(this, 6), dp(this, 1));
                 tag.setBackground(rounded(this, ACCENT_SOFT, 6));
@@ -311,7 +311,7 @@ public class OnboardingActivity extends Screen implements Account.Listener {
             r.addView(radio(on));
             r.setOnClickListener(v -> {
                 Prefs.setAgents(this, o[0]);
-                Prefs.setBackend(this, Account.known(o[0]) ? o[0] : "claude");
+                Prefs.setBackend(this, Account.known(o[0]) ? o[0] : "opencode");
                 render();
             });
             LinearLayout.LayoutParams p = full();

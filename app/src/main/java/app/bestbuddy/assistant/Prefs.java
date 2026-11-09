@@ -44,9 +44,9 @@ final class Prefs {
         sp(c).edit().putString("helper", status).putLong("helper_at", System.currentTimeMillis()).apply();
     }
 
-    /** Which agent answers the bubble: "claude" (default), "codex", "opencode", "agy" or "grok". */
+    /** Which agent answers the bubble: "opencode" (default, free), "claude", "codex", "agy" or "grok". */
     static String backend(Context c) {
-        return sp(c).getString("backend", "claude");
+        return sp(c).getString("backend", "opencode");
     }
 
     static void setBackend(Context c, String backend) {
@@ -315,7 +315,7 @@ final class Prefs {
 
     /** Which agents the user wants: "claude", "codex", "opencode", "agy", "grok" or "both" (Claude Code and Codex). */
     static String agents(Context c) {
-        return sp(c).getString("agents", "claude");
+        return sp(c).getString("agents", "opencode");
     }
 
     static void setAgents(Context c, String a) {

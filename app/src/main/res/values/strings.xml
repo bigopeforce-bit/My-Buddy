@@ -28,8 +28,8 @@
     <string name="onboarding_welcome_ask_title">Ask in plain words</string>
     <!-- Two example requests a user could type. Translate them naturally and use your language's quotation marks. -->
     <string name="onboarding_welcome_ask_text">\"Reply to Sam that I\'m late\", \"add milk to my basket\".</string>
-    <string name="onboarding_welcome_plan_title">Your own plan, no API key</string>
-    <string name="onboarding_welcome_plan_text">Runs Claude Code from your Claude subscription. Codex with a ChatGPT plan, Antigravity with a Google account, Grok with a Google or X account and OpenCode\'s free models work too.</string>
+    <string name="onboarding_welcome_plan_title">Free to start, no API key</string>
+    <string name="onboarding_welcome_plan_text">Starts on OpenCode\'s free models, with no account. Claude Code works with a Claude subscription, Codex with a ChatGPT plan, Antigravity with a Google account and Grok with a Google or X account.</string>
     <string name="onboarding_welcome_control_title">You stay in control</string>
     <string name="onboarding_welcome_control_text">Sending, posting, buying and deleting always ask first.</string>
     <!-- Small lowercase mono line under the list. -->
