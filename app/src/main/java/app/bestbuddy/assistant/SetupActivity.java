@@ -202,7 +202,8 @@ public class SetupActivity extends Screen implements Account.Listener, RemoteSes
                 installed ? getString(R.string.setup_step_install_done, acc.name())
                         : acc.step == Account.Step.INSTALLING ? acc.detail
                         : Ui.downloadNote(this, getString(acc.claude() ? R.string.setup_step_install_claude : acc.opencode()
-                        ? R.string.setup_step_install_opencode : acc.grok() ? R.string.setup_step_install_grok
+                        ? R.string.setup_step_install_opencode : acc.gemini() ? R.string.setup_step_install_gemini
+                        : acc.grok() ? R.string.setup_step_install_grok
                         : R.string.setup_step_install_codex, acc.name())),
                 installed, installed || acc.step == Account.Step.INSTALLING ? null : getString(R.string.setup_install),
                 v -> openAgent(backend), null, null);
@@ -212,7 +213,8 @@ public class SetupActivity extends Screen implements Account.Listener, RemoteSes
                 ? getString(signed ? R.string.setup_step_signin_opencode_done : R.string.setup_step_signin_opencode)
                 : signed ? (acc.email.isEmpty() ? getString(R.string.setup_step_signin_done)
                 : getString(R.string.setup_step_signin_done_email, acc.email))
-                : getString(acc.claude() ? R.string.setup_step_signin_claude : acc.grok() ? R.string.setup_step_signin_grok
+                : getString(acc.claude() ? R.string.setup_step_signin_claude : acc.gemini() ? R.string.setup_step_signin_gemini
+                : acc.grok() ? R.string.setup_step_signin_grok
                 : R.string.setup_step_signin_codex);
         // Claude Code and Codex also take an API key (on their sign-in screen)
         // a saved key this agent can't use: say so, and offer the agent that can
@@ -331,8 +333,8 @@ public class SetupActivity extends Screen implements Account.Listener, RemoteSes
         TextView brainInfo = text(this, getString(R.string.setup_default_brain_info), 13, MUTED);
         brainInfo.setPaddingRelative(0, dp(this, 2), 0, 0);
         ag.addView(brainInfo);
-        ag.addView(segmented(this, new String[][]{{"opencode", "OpenCode"}, {"agy", "Antigravity"}, {"grok", "Grok"},
-                        {"codex", "Codex"}},
+        ag.addView(segmented(this, new String[][]{{"opencode", "OpenCode"}, {"gemini", "Gemini CLI"}, {"agy", "Antigravity"},
+                        {"grok", "Grok"}, {"codex", "Codex"}},
                 backend, false, v -> {
                     Prefs.setBackend(this, v);
                     Toast.makeText(this, getString(R.string.setup_default_brain_set, Account.nameOf(v)),
@@ -355,7 +357,7 @@ public class SetupActivity extends Screen implements Account.Listener, RemoteSes
         LinearLayout mcp = card();
         mcp.setPaddingRelative(dp(this, 16), dp(this, 14), dp(this, 16), dp(this, 16));
         mcp.addView(text(this, getString(R.string.setup_phone_tools_info), 14, MUTED));
-        mcp.addView(segmented(this, new String[][]{{"opencode", "opencode"}, {"agy", "agy"}, {"grok", "grok"},
+        mcp.addView(segmented(this, new String[][]{{"opencode", "opencode"}, {"gemini", "gemini"}, {"agy", "agy"}, {"grok", "grok"},
                         {"codex", "codex"}},
                 mcpAgent, true, v -> {
                     mcpAgent = v;
@@ -378,6 +380,10 @@ public class SetupActivity extends Screen implements Account.Listener, RemoteSes
                 : "agy".equals(mcpAgent)
                 // Antigravity keeps it in ~/.gemini/config/mcp_config.json
                 ? "agy mcp add --header 'Authorization: Bearer " + token + "' phone " + url
+                : "gemini".equals(mcpAgent)
+                // Gemini CLI keeps it in ~/.gemini/settings.json; run again to update (the name must not exist twice)
+                ? "gemini mcp remove phone >/dev/null 2>&1; gemini mcp add --transport http --header 'Authorization: Bearer "
+                + token + "' --timeout 600000 --trust --scope user phone " + url
                 : "grok".equals(mcpAgent)
                 // Grok keeps it in ~/.grok/config.toml; as for Codex, the timeout line goes under the table it just wrote
                 // (running it again rewrites the table, so the line is never doubled)

@@ -177,8 +177,8 @@ public class OnboardingActivity extends Screen implements Account.Listener {
                     note("opencode".equals(agents) ? getString(R.string.onboarding_access_privacy_opencode, agentNames())
                             : "both".equals(agents) ? getString(R.string.onboarding_access_privacy_both)
                             : getString(R.string.onboarding_access_privacy, agentNames(),
-                            "codex".equals(agents) ? "OpenAI" : "agy".equals(agents) ? "Google" : "grok".equals(agents) ? "xAI"
-                            : "Anthropic"));
+                            "codex".equals(agents) ? "OpenAI" : "agy".equals(agents) || "gemini".equals(agents) ? "Google"
+                            : "grok".equals(agents) ? "xAI" : "Anthropic"));
                     if (accessTries > 0 && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) restrictedHelp();
                     note(getString(R.string.onboarding_access_list_hint));
                     primary(getString(R.string.onboarding_access_open), v -> {
@@ -263,6 +263,7 @@ public class OnboardingActivity extends Screen implements Account.Listener {
         String cur = Prefs.agents(this);
         String[][] opts = {
                 {"opencode", "OpenCode", getString(R.string.onboarding_brain_opencode)},
+                {"gemini", "Gemini CLI", getString(R.string.onboarding_brain_gemini)},
                 {"agy", "Antigravity", getString(R.string.onboarding_brain_agy)},
                 {"grok", "Grok", getString(R.string.onboarding_brain_grok)},
                 {"codex", "Codex", getString(R.string.onboarding_brain_codex)},
@@ -351,10 +352,12 @@ public class OnboardingActivity extends Screen implements Account.Listener {
                         : acc.step == Account.Step.ERROR ? acc.detail
                         : installed ? getString(acc.claude() ? R.string.onboarding_agent_sign_in_claude : acc.opencode()
                         ? R.string.onboarding_agent_checking_opencode : acc.agy() ? R.string.onboarding_agent_sign_in_agy
+                        : acc.gemini() ? R.string.onboarding_agent_sign_in_gemini
                         : acc.grok() ? R.string.onboarding_agent_sign_in_grok : R.string.onboarding_agent_sign_in_codex)
                         : Ui.downloadNote(this, getString(acc.claude() ? R.string.onboarding_agent_download_claude
                         : acc.opencode() ? R.string.onboarding_agent_download_opencode
                         : acc.agy() ? R.string.onboarding_agent_download_agy
+                        : acc.gemini() ? R.string.onboarding_agent_download_gemini
                         : acc.grok() ? R.string.onboarding_agent_download_grok
                         : R.string.onboarding_agent_download_codex)), 14,
                         acc.step == Account.Step.ERROR ? ERR : MUTED);
@@ -362,7 +365,7 @@ public class OnboardingActivity extends Screen implements Account.Listener {
                 card.addView(how);
                 if (!installing && !(installed && acc.opencode())) {
                     Button b = button(this, installed ? getString(acc.claude() ? R.string.onboarding_sign_in_claude
-                            : acc.agy() ? R.string.onboarding_sign_in_google : acc.grok() ? R.string.onboarding_sign_in_grok
+                            : acc.agy() || acc.gemini() ? R.string.onboarding_sign_in_google : acc.grok() ? R.string.onboarding_sign_in_grok
                             : R.string.onboarding_sign_in_chatgpt)
                             : getString(R.string.onboarding_install_agent, acc.name()), first);
                     b.setOnClickListener(v -> {

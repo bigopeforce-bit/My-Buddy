@@ -557,7 +557,7 @@ public class ChatActivity extends Screen implements ChatHub.Listener, Browser.Li
         final EditText et = new EditText(this);
         et.setHint(getString(R.string.chat_model_other_hint, "claude".equals(ses.backend) ? "claude-opus-5-5"
                 : "opencode".equals(ses.backend) ? "anthropic/claude-sonnet-5-5" : "agy".equals(ses.backend) ? "gemini-3.8-flash-high"
-                : "grok".equals(ses.backend) ? "grok-4.7" : "gpt-6.1-sol"));
+                : "grok".equals(ses.backend) ? "grok-4.7" : "gemini".equals(ses.backend) ? "gemini-3-pro-preview" : "gpt-6.1-sol"));
         et.setHintTextColor(MUTED);
         et.setTextColor(TEXT);
         et.setTextSize(14);

@@ -104,11 +104,13 @@ public class SignInActivity extends Screen implements Account.Listener {
                         ? R.string.signin_install_sub_claude
                         : acc.opencode() ? R.string.signin_install_sub_opencode
                         : acc.agy() ? R.string.signin_install_sub_agy
+                        : acc.gemini() ? R.string.signin_install_sub_gemini
                         : acc.grok() ? R.string.signin_install_sub_grok
                         : R.string.signin_install_sub_codex), false);
                 note(Ui.downloadNote(this, getString(acc.claude() ? R.string.signin_install_size_claude
                         : acc.opencode() ? R.string.signin_install_size_opencode
                         : acc.agy() ? R.string.signin_install_size_agy
+                        : acc.gemini() ? R.string.signin_install_size_gemini
                         : acc.grok() ? R.string.signin_install_size_grok
                         : R.string.signin_install_size_codex)));
                 primary(getString(R.string.signin_install, acc.name()), v -> acc.install(this));
@@ -125,12 +127,14 @@ public class SignInActivity extends Screen implements Account.Listener {
                     break;
                 }
                 header(R.drawable.ms_shield_person, getString(acc.claude() ? R.string.signin_title_claude
-                                : acc.agy() ? R.string.signin_title_google : acc.grok() ? R.string.signin_title_grok
+                                : acc.agy() || acc.gemini() ? R.string.signin_title_google : acc.grok() ? R.string.signin_title_grok
                                 : R.string.signin_title_chatgpt),
                         getString(acc.claude() ? R.string.signin_sub_claude : acc.agy() ? R.string.signin_sub_agy
+                                : acc.gemini() ? R.string.signin_sub_gemini
                                 : acc.grok() ? R.string.signin_sub_grok : R.string.signin_sub_chatgpt), false);
-                primary(getString(acc.claude() ? R.string.signin_with_claude : acc.agy() ? R.string.signin_with_google
-                        : acc.grok() ? R.string.signin_with_grok : R.string.signin_with_chatgpt), v -> acc.startLogin(this));
+                primary(getString(acc.claude() ? R.string.signin_with_claude : acc.agy() || acc.gemini()
+                        ? R.string.signin_with_google : acc.grok() ? R.string.signin_with_grok : R.string.signin_with_chatgpt),
+                        v -> acc.startLogin(this));
                 secondary(getString(acc.pastesCode() || acc.grok() ? R.string.signin_other_device : R.string.signin_with_code), v -> {
                     pasteOpen = true;
                     acc.startLogin(this, true);
@@ -150,7 +154,8 @@ public class SignInActivity extends Screen implements Account.Listener {
                 openBrowserOnce();
                 header(R.drawable.ms_shield_person, getString(R.string.signin_approve_title), acc.grok()
                         ? getString(R.string.signin_approve_grok, acc.userCode == null ? "…" : acc.userCode) : getString(acc.claude()
-                        ? R.string.signin_approve_claude : acc.agy() ? R.string.signin_approve_agy : R.string.signin_approve_codex), false);
+                        ? R.string.signin_approve_claude : acc.agy() ? R.string.signin_approve_agy
+                        : acc.gemini() ? R.string.signin_approve_gemini : R.string.signin_approve_codex), false);
                 primary(getString(R.string.signin_open_again), v -> {
                     openedUrl = null;
                     openBrowserOnce();
@@ -243,7 +248,8 @@ public class SignInActivity extends Screen implements Account.Listener {
         final String link = acc.url;
         if (acc.pastesCode()) {
             header(R.drawable.ms_shield_person, getString(R.string.signin_other_device),
-                    getString(acc.agy() ? R.string.signin_remote_agy : R.string.signin_remote_claude), false);
+                    getString(acc.agy() ? R.string.signin_remote_agy : acc.gemini() ? R.string.signin_remote_gemini
+                            : R.string.signin_remote_claude), false);
         } else {
             header(R.drawable.ms_shield_person, getString(acc.grok() ? R.string.signin_other_device : R.string.signin_enter_code),
                     getString(acc.grok() ? R.string.signin_remote_grok : R.string.signin_remote_codex), false);
@@ -339,7 +345,8 @@ public class SignInActivity extends Screen implements Account.Listener {
         });
         c.addView(head, full());
         if (pasteOpen) {
-            c.addView(text(this, getString(acc.agy() ? R.string.signin_paste_help_agy : R.string.signin_paste_help), 14, MUTED));
+            c.addView(text(this, getString(acc.agy() ? R.string.signin_paste_help_agy : acc.gemini()
+                    ? R.string.signin_paste_help_gemini : R.string.signin_paste_help), 14, MUTED));
             LinearLayout r = row(this);
             r.setPaddingRelative(0, dp(this, 10), 0, 0);
             EditText et = new EditText(this);

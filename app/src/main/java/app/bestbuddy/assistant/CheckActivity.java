@@ -221,6 +221,7 @@ public class CheckActivity extends Screen {
             case "codex": return "chatgpt.com";
             case "opencode": return "opencode.ai";
             case "agy": return "generativelanguage.googleapis.com";
+            case "gemini": return "cloudcode-pa.googleapis.com";
             case "grok": return "api.x.ai";
             default: return "api.anthropic.com";
         }

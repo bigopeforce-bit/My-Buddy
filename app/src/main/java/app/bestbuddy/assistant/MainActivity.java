@@ -96,6 +96,7 @@ public class MainActivity extends Screen implements ChatHub.Listener, Account.Li
         Account.OPENCODE.refresh(this);
         Account.AGY.refresh(this);
         Account.GROK.refresh(this);
+        Account.GEMINI.refresh(this);
     }
 
     private final Runnable waitingChanged = this::render;

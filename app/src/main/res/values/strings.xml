@@ -45,6 +45,8 @@
     <string name="onboarding_brain_opencode">No account needed. Connect your own providers later.</string>
     <!-- Under "Antigravity" (Google's agent) in the agent choice. Google AI Pro and Ultra are Google's paid plans (names stay as they are). -->
     <string name="onboarding_brain_agy">Uses your Google account, also with Google AI Pro or Ultra.</string>
+    <!-- Under "Gemini CLI" (Google's agent) in the agent choice. -->
+    <string name="onboarding_brain_gemini">Google\'s Gemini, with a free Google account.</string>
     <!-- Under "Grok" (xAI's agent) in the agent choice. Grok, xAI and X stay as they are; "X" is the social network. -->
     <string name="onboarding_brain_grok">Uses your Grok account (sign in with Google or X).</string>
     <!-- The option that installs both Claude Code and Codex. -->
@@ -102,6 +104,8 @@
     <string name="onboarding_agent_sign_in_codex">Sign in with your ChatGPT account in the browser, then come back.</string>
     <!-- Antigravity: the sign-in page shows a code that BestBuddy reads by itself. -->
     <string name="onboarding_agent_sign_in_agy">Sign in with your Google account. Your browser opens; sign in there and BestBuddy picks up the code by itself.</string>
+    <!-- Gemini CLI: the same Google sign-in as Antigravity. -->
+    <string name="onboarding_agent_sign_in_gemini">Sign in with your Google account. Your browser opens; sign in there and BestBuddy picks up the code by itself.</string>
     <!-- Grok: the browser opens with a one-time code that the user confirms on the page. -->
     <string name="onboarding_agent_sign_in_grok">Sign in with your Grok account. Your browser opens; confirm the code there and BestBuddy comes back by itself.</string>
     <!-- "BestBuddy's Linux" = the small Linux system built into BestBuddy. -->
@@ -109,6 +113,7 @@
     <string name="onboarding_agent_download_opencode">Downloads about 230 MB once (BestBuddy\'s Linux, Node.js and OpenCode). No account needed.</string>
     <string name="onboarding_agent_download_codex">Downloads about 150 MB once (BestBuddy\'s Linux, Node.js and Codex from OpenAI).</string>
     <string name="onboarding_agent_download_agy">Downloads about 200 MB once (BestBuddy\'s Linux and the Antigravity CLI from Google).</string>
+    <string name="onboarding_agent_download_gemini">Downloads about 220 MB once (BestBuddy\'s Linux, Node.js and Gemini CLI from Google).</string>
     <string name="onboarding_agent_download_grok">Downloads about 170 MB once (BestBuddy\'s Linux and Grok Build from xAI).</string>
     <!-- Buttons on the agent card. -->
     <string name="onboarding_sign_in_claude">Sign in with Claude</string>
@@ -911,12 +916,14 @@
     <string name="signin_install_sub_codex">Runs Codex inside BestBuddy on your ChatGPT plan.</string>
     <string name="signin_install_sub_agy">Runs Google\'s Antigravity CLI inside BestBuddy on your Google account: its free plan, or Google AI Pro or Ultra.</string>
     <string name="signin_install_sub_grok">Runs xAI\'s Grok Build inside BestBuddy on your Grok account (signing in with Google or X works).</string>
+    <string name="signin_install_sub_gemini">Runs Google\'s Gemini CLI inside BestBuddy on your Google account: its free plan, or Google AI Pro or Ultra.</string>
     <!-- "BestBuddy's Linux" = the small Linux system BestBuddy installs inside the app. -->
     <string name="signin_install_size_claude">Downloads about 235 MB once: BestBuddy\'s Linux and Claude Code from Anthropic. Use Wi-Fi if you can.</string>
     <string name="signin_install_size_opencode">Downloads about 230 MB once: BestBuddy\'s Linux, Node.js and OpenCode. Use Wi-Fi if you can.</string>
     <string name="signin_install_size_codex">Downloads about 150 MB once: BestBuddy\'s Linux, Node.js and Codex from OpenAI. Use Wi-Fi if you can.</string>
     <string name="signin_install_size_agy">Downloads about 200 MB once: BestBuddy\'s Linux and the Antigravity CLI from Google. Use Wi-Fi if you can.</string>
     <string name="signin_install_size_grok">Downloads about 170 MB once: BestBuddy\'s Linux and Grok Build from xAI. Use Wi-Fi if you can.</string>
+    <string name="signin_install_size_gemini">Downloads about 220 MB once: BestBuddy\'s Linux, Node.js and Gemini CLI from Google. Use Wi-Fi if you can.</string>
 
     <!-- Sign-in screen: install or update in progress (screen titles). -->
     <string name="signin_installing">Installing</string>
@@ -932,6 +939,7 @@
     <string name="signin_sub_chatgpt">Use your ChatGPT account (Plus, Pro or Business). Your browser opens; approve there and BestBuddy comes back by itself.</string>
     <string name="signin_sub_agy">Use your Google account. Your browser opens; sign in there and BestBuddy picks up the code by itself. Antigravity waits about a minute.</string>
     <string name="signin_sub_grok">Use your Grok account; signing in with Google or X works too. Your browser opens with a code; confirm it there and BestBuddy comes back by itself.</string>
+    <string name="signin_sub_gemini">Use your Google account. Your browser opens; sign in there and BestBuddy picks up the code by itself.</string>
     <!-- Main button. -->
     <string name="signin_with_claude">Sign in with Claude</string>
     <string name="signin_with_chatgpt">Sign in with ChatGPT</string>
@@ -952,6 +960,7 @@
     <string name="signin_approve_claude">Tap Authorize on the Claude page. BestBuddy picks up the code and comes back by itself.</string>
     <string name="signin_approve_codex">Sign in and allow Codex. Then come back to BestBuddy; it finishes by itself.</string>
     <string name="signin_approve_agy">Sign in and allow Antigravity. BestBuddy picks up the code the page shows and comes back by itself. If it takes over a minute, start again.</string>
+    <string name="signin_approve_gemini">Sign in and allow Gemini CLI. BestBuddy picks up the code the page shows and comes back by itself.</string>
     <!-- %1$s = the one-time code shown on Grok's sign-in page, e.g. "ABCD-1234". -->
     <string name="signin_approve_grok">Check that the page shows %1$s, then confirm and sign in. BestBuddy comes back by itself.</string>
     <!-- Button. -->
@@ -969,6 +978,7 @@
     <string name="signin_enter_code">Enter this code</string>
     <string name="signin_remote_codex">On any device, open the link below, sign in to ChatGPT and enter the code. BestBuddy finishes by itself.</string>
     <string name="signin_remote_agy">Open this link on any device and sign in. Then copy the code the page shows and paste it below, within about a minute.</string>
+    <string name="signin_remote_gemini">Open this link on any device and sign in. Then copy the code the page shows and paste it below.</string>
     <string name="signin_remote_grok">On any device, open the link below, sign in to Grok and confirm the code. BestBuddy finishes by itself.</string>
     <!-- Buttons and the toasts after them. -->
     <string name="signin_copy_code">Copy code</string>
@@ -991,6 +1001,7 @@
     <!-- "Copy Code" is the button on Claude's sign-in web page; use the label that page shows in your language. -->
     <string name="signin_paste_help">If BestBuddy doesn\'t come back by itself: tap Copy Code on the Claude page, then paste it here.</string>
     <string name="signin_paste_help_agy">If BestBuddy doesn\'t come back by itself: tap Copy to Clipboard on the Antigravity page, then paste it here.</string>
+    <string name="signin_paste_help_gemini">If BestBuddy doesn\'t come back by itself: tap Copy to Clipboard on the Gemini page, then paste it here.</string>
     <!-- Hint inside the empty text box for the code. Lowercase in English. -->
     <string name="signin_code_hint">code</string>
     <!-- Short button next to the text box: use the pasted code. Verb. -->
@@ -1038,6 +1049,7 @@
     <string name="account_tagline_codex">Uses your ChatGPT plan</string>
     <string name="account_tagline_agy">Uses your Google account</string>
     <string name="account_tagline_grok">Uses your Grok account</string>
+    <string name="account_tagline_gemini">Uses your Google account</string>
     <!-- Small tag beside an agent's name in the agent pickers (OpenCode, Antigravity, Grok): usable for free, within limits. -->
     <string name="agent_tag_free">free · limited</string>
     <!-- Install progress. -->
@@ -1083,6 +1095,7 @@
     <string name="models_default_opencode">OpenCode\'s default model</string>
     <string name="models_default_agy">Antigravity\'s default model</string>
     <string name="models_default_grok">Grok\'s default model</string>
+    <string name="models_default_gemini">Gemini CLI\'s default model (Auto)</string>
     <!-- Effort levels in a row of up to 6 segments: keep each very short (about 5 characters).
          "Auto" = the agent decides how much to think. -->
     <string name="models_effort_auto">Auto</string>
@@ -1163,6 +1176,7 @@
     <!-- %1$s = Codex. -->
     <string name="setup_step_install_codex">BestBuddy downloads its own small Linux and %1$s from OpenAI (about 150 MB).</string>
     <string name="setup_step_install_grok">BestBuddy downloads its own small Linux and %1$s from xAI (about 170 MB).</string>
+    <string name="setup_step_install_gemini">BestBuddy downloads its own small Linux and %1$s from Google (about 220 MB with Node.js).</string>
     <!-- Button (verb). -->
     <string name="setup_install">Install</string>
     <!-- Name of the sign-in setup step. -->
@@ -1175,6 +1189,7 @@
     <string name="setup_step_signin_claude">With your Claude account (Pro or Max). Your browser opens; approve there and BestBuddy comes back by itself.</string>
     <string name="setup_step_signin_codex">With your ChatGPT account. Your browser opens; approve there and BestBuddy comes back by itself.</string>
     <string name="setup_step_signin_grok">With your Grok account. Your browser opens; confirm the code there and BestBuddy comes back by itself.</string>
+    <string name="setup_step_signin_gemini">With your Google account. Your browser opens; sign in there and BestBuddy picks up the code by itself.</string>
     <!-- Button (verb). -->
     <string name="setup_sign_in">Sign in</string>
     <string name="setup_step_background_title">Let BestBuddy run in the background</string>

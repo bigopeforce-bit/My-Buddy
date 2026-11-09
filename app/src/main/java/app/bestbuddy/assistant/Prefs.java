@@ -44,7 +44,7 @@ final class Prefs {
         sp(c).edit().putString("helper", status).putLong("helper_at", System.currentTimeMillis()).apply();
     }
 
-    /** Which agent answers the bubble: "opencode" (default, free), "claude", "codex", "agy" or "grok". */
+    /** Which agent answers the bubble: "opencode" (default, free), "claude", "codex", "agy", "grok" or "gemini". */
     static String backend(Context c) {
         String b = sp(c).getString("backend", "opencode");
         return "claude".equals(b) || "both".equals(b) ? "opencode" : b; // Claude Code is no longer offered
@@ -314,7 +314,7 @@ final class Prefs {
         sp(c).edit().putInt("onboard_step", step).apply();
     }
 
-    /** Which agents the user wants: "claude", "codex", "opencode", "agy", "grok" or "both" (Claude Code and Codex). */
+    /** Which agents the user wants: "claude", "codex", "opencode", "agy", "grok", "gemini" or "both" (Claude Code and Codex). */
     static String agents(Context c) {
         String a = sp(c).getString("agents", "opencode");
         return "claude".equals(a) || "both".equals(a) ? "opencode" : a; // Claude Code is no longer offered

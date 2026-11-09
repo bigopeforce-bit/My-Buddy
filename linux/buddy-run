@@ -1,6 +1,6 @@
 #!/bin/bash
 # Run by the Buddy app inside its built-in Linux (Alpine, through proot).
-#   buddy-run <token> ask <session> <claude|codex|opencode|agy|grok> <dev:0|1|rule|play> <message> [model] [attachment-ids]
+#   buddy-run <token> ask <session> <claude|codex|opencode|agy|grok|gemini> <dev:0|1|rule|play> <message> [model] [attachment-ids]
 #     (rule: a notification rule's run, working for someone else's message: no shell, files or web tools;
 #      play: the Play version, which has no Linux tools at all)
 #                                    run the agent on the message in that session, streaming events to the bubble
@@ -8,13 +8,13 @@
 #   buddy-run <token> delete <session>     forget that session
 #   buddy-run <token> prune <id,id,...>    remove the folders of chats not in the list
 #   buddy-run <token> ping                 answer the app's setup check
-#   buddy-run <token> procs                list running Claude Code / Codex / OpenCode / Antigravity / Grok processes (buddy_procs)
-#   buddy-run <token> kill <pid>           stop a running Claude Code / Codex process and its children
+#   buddy-run <token> procs                list running Claude Code / Codex / OpenCode / Antigravity / Grok / Gemini processes (buddy_procs)
+#   buddy-run <token> kill <pid>           stop a running Claude Code / Codex / Gemini process and its children
 #   buddy-run <token> recent               list recent Claude Code / Codex sessions from their history (buddy_recent)
 #   buddy-run <token> transcript <claude|codex> <file>   last messages of a session (buddy_transcript)
 #   buddy-run <token> adopt <session> <claude|codex> <agent-session-id>  continue that session as a Buddy chat
 # Every event sent to the bubble carries "buddy_session" so the app can route it.
-HELPER_VERSION=25
+HELPER_VERSION=26
 set -u
 export PATH=$HOME/.local/bin:$HOME/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 # The claude launcher sets BUN_OPTIONS with a path relative to its folder; never inherit a stale one.
@@ -59,6 +59,7 @@ agent_of() {
     */opencode-ai/*|*/@opencode/cli*/*|*/bin/opencode) echo opencode ;;
     */antigravity-cli/bin/*|*/bin/agy) echo agy ;;
     grok|*/bin/grok|*/grok-linux-*) echo grok ;;
+    */bin/node|node) case "$cmd" in *@google/gemini-cli/dist/*) echo gemini ;; *) return 1 ;; esac ;;
     *) return 1 ;;
   esac
 }
@@ -66,14 +67,15 @@ agent_of() {
 case "$CMD" in
   ping) # setup check: proves RUN_COMMAND, the helper and the callback all work
     agents=$({ have claude && echo claude; have codex && echo codex; have opencode && echo opencode; have agy && echo agy
-      have grok && echo grok; } | paste -sd, -)
+      have grok && echo grok; have gemini && echo gemini; } | paste -sd, -)
     # signed in = the agent's saved login exists (OpenCode works without one: its free models)
     # (or Claude Code's API key in its settings' env; Codex keeps an API key in auth.json too)
     # (or an API key service saved in Buddy that the agent can use: $D/providers, without the keys)
     signed=$({ { [ -s "$HOME/.claude/.credentials.json" ] || grep -qs '"anthropic":true' "$D"/providers/*.json; } && echo claude
       { [ -s "$HOME/.codex/auth.json" ] || grep -qs '"openai":"responses"' "$D"/providers/*.json; } && echo codex
       have opencode && echo opencode; [ -s "$HOME/.gemini/antigravity-cli/antigravity-oauth-token" ] && echo agy
-      [ -s "$HOME/.grok/auth.json" ] && echo grok; } | paste -sd, -)
+      [ -s "$HOME/.grok/auth.json" ] && echo grok
+      [ -s "$HOME/.gemini/oauth_creds.json" ] && echo gemini; } | paste -sd, -)
     cm=$(jq -c '[.models[] | select(.visibility == "list") | [.slug, .display_name]]' "$HOME/.codex/models_cache.json" 2>/dev/null)
     # OpenCode's model list (a second or two; a background refresh got killed when the helper exited, so the list
     # never updated and new free models didn't show). On failure the last good list is kept.
@@ -105,7 +107,7 @@ case "$CMD" in
       for q in $(descendants "$(cat "$f")"); do owner[$q]=$sid; done
     done
     {
-      for p in $(pgrep -f 'claude/versions/|codex-linux-|/bin/codex|opencode-ai/|@opencode/cli|/bin/opencode|antigravity-cli/bin/|/bin/agy|^grok( |$)|/bin/grok|grok-linux-' 2>/dev/null); do
+      for p in $(pgrep -f 'claude/versions/|codex-linux-|/bin/codex|opencode-ai/|@opencode/cli|/bin/opencode|antigravity-cli/bin/|/bin/agy|^grok( |$)|/bin/grok|grok-linux-|@google/gemini-cli/dist/' 2>/dev/null); do
         a=$(agent_of "$p") || continue
         [ "$p" = "$$" ] && continue
         cwd=$(readlink "/proc/$p/cwd" 2>/dev/null)
@@ -206,9 +208,11 @@ case "$CMD" in
     # forget (an incognito chat): the agents own records of the conversation go too
     if [ "${4:-}" = forget ]; then
       c=$(cat "$S/claude-session" 2>/dev/null); t=$(cat "$S/codex-thread" 2>/dev/null); o=$(cat "$S/opencode-session" 2>/dev/null)
+      u=$(cat "$S/gemini-session" 2>/dev/null)
       [[ "$c" =~ ^[A-Za-z0-9-]+$ ]] && rm -f "$HOME"/.claude/projects/*/"$c".jsonl
       [[ "$t" =~ ^[A-Za-z0-9-]+$ ]] && find "$HOME/.codex/sessions" -name "rollout-*$t.jsonl" -delete 2>/dev/null
       [[ "$o" =~ ^[A-Za-z0-9_-]+$ ]] && have opencode && timeout 30 opencode session delete $(oc2 && echo --standalone) "$o" >/dev/null 2>&1
+      [[ "$u" =~ ^[A-Za-z0-9-]+$ ]] && find "$HOME/.gemini/tmp" -path "*/chats/session-*-${u:0:8}.jsonl" -delete 2>/dev/null
     fi
     rm -rf "${S:?}"
     exit 0 ;;
@@ -726,6 +730,123 @@ stream_agy() {
   done
 }
 
+# ---------------------------------------------------------------- Gemini CLI
+# Gemini CLI reads its MCP servers, settings and global GEMINI.md from ~/.gemini, but each chat needs its own phone
+# address (?chat=) and its own tool limits. So every run gets its own HOME: a .gemini whose settings.json and
+# GEMINI.md are this chat's, and everything else (the sign-in, sessions) linked to the real ~/.gemini. A headless run
+# can't ask: a normal chat has no shell or file edits, a rule's run no files, web or memory either; developer mode
+# approves everything (--approval-mode yolo), like Codex's full access.
+GEMINI_TOOLS_NORMAL='["run_shell_command","replace","write_file"]'
+GEMINI_TOOLS_RULE='["run_shell_command","replace","write_file","read_file","read_many_files","glob","grep_search","list_directory","google_web_search","web_fetch","save_memory","activate_skill","write_todos","complete_task","list_mcp_resources","read_mcp_resource"]'
+run_gemini() {
+  local h=$S/gemini-home g=$HOME/.gemini f ex
+  mkdir -p "$h/.gemini" "$g/tmp"
+  for f in "$g"/* "$g"/.[!.]*; do
+    [ -e "$f" ] || continue
+    case "${f##*/}" in settings.json|GEMINI.md) continue ;; esac
+    ln -sfn "$f" "$h/.gemini/${f##*/}"
+  done
+  ex=$GEMINI_TOOLS_NORMAL
+  [ "$DEV" = rule ] && ex=$GEMINI_TOOLS_RULE
+  ( umask 077
+    jq -n --arg url "$URL/mcp?chat=$SID" --arg auth "Bearer $TOKEN" --argjson ex "$ex" \
+      --argjson base "$(jq -c '.' "$g/settings.json" 2>/dev/null || echo '{}')" '
+      (if ($base | type) == "object" then $base else {} end) as $b
+      | $b * {security:{auth:{selectedType:"oauth-personal"}},
+              mcpServers:{phone:{httpUrl:$url, headers:{Authorization:$auth}, timeout:600000, trust:true}},
+              mcp:{allowed:["phone"]},
+              tools:{exclude:((($b.tools.exclude // []) + $ex) | unique)}}' > "$h/.gemini/settings.json"
+    { printf '%s\n\n' "$SYSTEM"
+      printf '%s' 'In this app the phone tools are on the MCP server named "phone": mcp_phone_read_screen, mcp_phone_tap, mcp_phone_long_press, mcp_phone_type_text, mcp_phone_scroll, mcp_phone_swipe, mcp_phone_press, mcp_phone_open_app, mcp_phone_list_apps, mcp_phone_open_url, mcp_phone_screenshot, mcp_phone_wait, mcp_phone_confirm, mcp_phone_ask, mcp_phone_notify, mcp_phone_reply_notification, mcp_phone_schedule_message, mcp_phone_list_scheduled, mcp_phone_cancel_scheduled, mcp_phone_update_buddy, mcp_phone_install_apk and mcp_phone_wait_for_install'
+      [ "$BROWSER" = 1 ] && printf '%s' ', and for the background browser mcp_phone_browser_open, mcp_phone_browser_read, mcp_phone_browser_click, mcp_phone_browser_type, mcp_phone_browser_scroll, mcp_phone_browser_screenshot, mcp_phone_browser_back and mcp_phone_browser_tabs'
+      printf '%s' '. Always call them by these exact names; they are available in every message of this chat.'
+      [ "$DEV" = 1 ] || printf '%s' ' Shell commands and file edits are not available in this chat; do not try them.'
+      printf '\n'
+    } > "$h/.gemini/GEMINI.md"
+  )
+  local args=(-p "$MSG" --output-format stream-json)
+  [ -s "$S/gemini-session" ] && args+=(--resume "$(cat "$S/gemini-session")")
+  [ -n "${MODEL:-}" ] && args+=(--model "$MODEL")
+  [ "$DEV" = 1 ] && args+=(--approval-mode yolo)
+  [ ${#ATT[@]} -gt 0 ] && args+=(--include-directories "$S/files")
+  rm -f "$S/gemini-error"
+  cd "$W" && HOME=$h GEMINI_CLI_SYSTEM_SETTINGS_PATH="$h/.gemini/settings.json" GEMINI_CLI_TRUST_WORKSPACE=true \
+    gemini "${args[@]}" </dev/null 2>"$S/last-error.log"
+}
+
+# Translate Gemini CLI's stream-json events (init, message, tool_use, tool_result, error, result) into the Claude Code
+# stream format. Its answer arrives in delta pieces; the text is shown when a tool call or the end of the turn follows.
+# Its phone tools are mcp_phone_<tool>; the bubble knows them as mcp__phone__<tool>.
+stream_gemini() {
+  local line typ t pending="" done=0
+  while IFS= read -r line; do
+    [ -z "$line" ] && continue
+    typ=$(printf '%s' "$line" | jq -r '.type // empty' 2>/dev/null)
+    case "$typ" in
+      init)
+        printf '%s' "$line" | jq -r '.session_id // empty' 2>/dev/null > "$S/gemini-session.new"
+        if [ -s "$S/gemini-session.new" ]; then mv "$S/gemini-session.new" "$S/gemini-session"; else rm -f "$S/gemini-session.new"; fi ;;
+      message)
+        [ "$(printf '%s' "$line" | jq -r '.role // empty' 2>/dev/null)" = assistant ] || continue
+        t=$(printf '%s' "$line" | jq -j '.content // ""' 2>/dev/null; printf x)
+        pending+=$t
+        pending=${pending%x} ;;
+      tool_use)
+        if [ -n "$pending" ]; then
+          jq -cn --arg t "$pending" --arg s "$SID" \
+            '{type:"assistant", message:{content:[{type:"text", text:$t}]}, buddy_session:$s}' | post
+          pending=""
+        fi
+        printf '%s' "$line" | jq -c --arg s "$SID" '
+          (.tool_name // "") as $t
+          | ($t | ltrimstr("mcp_") | split("_")) as $p
+          | select($t != "")
+          | {type:"assistant", message:{content:[{type:"tool_use",
+              name:(if ($t | startswith("mcp_")) then "mcp__" + $p[0] + "__" + ($p[1:] | join("_"))
+                    elif $t == "run_shell_command" then "Bash"
+                    elif $t == "read_file" or $t == "read_many_files" then "Read"
+                    elif $t == "write_file" or $t == "replace" then "Edit"
+                    elif $t == "glob" then "Glob"
+                    elif $t == "grep_search" then "Grep"
+                    elif $t == "list_directory" then "LS"
+                    elif $t == "google_web_search" then "WebSearch"
+                    elif $t == "web_fetch" then "WebFetch"
+                    elif $t == "activate_skill" then "Skill"
+                    elif $t == "write_todos" then "TodoWrite"
+                    else $t end),
+              input:(.parameters // {})}]}}
+          | . + {buddy_session:$s}' 2>/dev/null \
+          | while IFS= read -r ev; do [ -n "$ev" ] && printf '%s' "$ev" | post; done ;;
+      error)
+        if [ "$(printf '%s' "$line" | jq -r '.severity // empty' 2>/dev/null)" = error ]; then
+          printf '%s' "$line" | jq -r '.message // ""' 2>/dev/null > "$S/gemini-error"
+        fi ;;
+      result)
+        done=1
+        if [ "$(printf '%s' "$line" | jq -r '.status // empty' 2>/dev/null)" = success ]; then
+          if [ -n "$pending" ]; then
+            jq -cn --arg t "$pending" --arg s "$SID" \
+              '{type:"assistant", message:{content:[{type:"text", text:$t}]}, buddy_session:$s}' | post
+            pending=""
+          fi
+          jq -cn --arg s "$SID" '{type:"result", subtype:"success", result:"", buddy_session:$s}' | post
+        else
+          t=$(printf '%s' "$line" | jq -r '.error.message // empty' 2>/dev/null)
+          [ -n "$t" ] || t=$(cat "$S/gemini-error" 2>/dev/null)
+          [ -n "$t" ] || t="the request failed"
+          printf '%s' "$t" > "$S/gemini-error"
+          jq -cn --arg t "$t" --arg s "$SID" \
+            '{type:"result", subtype:"error", is_error:true, result:("Gemini: " + $t), buddy_session:$s}' | post
+        fi ;;
+    esac
+  done
+  # a turn that ended without a result event: still show its answer
+  if [ "$done" = 0 ] && [ -n "$pending" ]; then
+    jq -cn --arg t "$pending" --arg s "$SID" '{type:"assistant", message:{content:[{type:"text", text:$t}]}, buddy_session:$s}' | post
+    jq -cn --arg s "$SID" '{type:"result", subtype:"success", result:"", buddy_session:$s}' | post
+  fi
+}
+
 # ----------------------------------------------------------------------- Grok
 # grok reads MCP servers from ~/.grok/config.toml (and Claude Code's ~/.claude.json), but each chat needs its own phone
 # address (?chat=). So every run gets its own GROK_HOME: the user's config.toml without its MCP servers, plus the phone
@@ -902,6 +1023,18 @@ tools (call_mcp_tool, ServerName \"phone\") and finish the user's request."
     # the same error, which would show it twice
     [ -s "$S/grok-error" ] && status=0
     name=Grok
+  elif [ "$BACKEND" = gemini ]; then
+    if ! have gemini; then event buddy_error "Gemini CLI isn't installed yet. Install it in Buddy's Settings."; exit 0; fi
+    run_gemini | stream_gemini
+    status=${PIPESTATUS[0]}
+    if [ "$status" -ne 0 ] && [ -s "$S/gemini-session" ] && grep -q -i -E 'session.*(not found|no such|unknown)|could not (find|resume)' "$S/last-error.log" 2>/dev/null; then
+      rm -f "$S/gemini-session"   # old session is gone; retry as a new conversation
+      run_gemini | stream_gemini
+      status=${PIPESTATUS[0]}
+    fi
+    # a failed turn is already in the chat from its result; Gemini also exits non-zero and prints it
+    [ -s "$S/gemini-error" ] && status=0
+    name="Gemini CLI"
   elif [ "$BACKEND" = codex ]; then
     if ! have codex; then event buddy_error "Codex isn't installed yet. Install it in Buddy's Settings."; exit 0; fi
     run_codex | stream_codex

@@ -22,6 +22,16 @@ final class Models {
             {"", "Default"},
             {"opencode/big-pickle", "opencode/big-pickle"},
     };
+    /** Gemini CLI's models (--model); Auto lets it pick the best Gemini 3 model for the task. */
+    static final String[][] GEMINI = {
+            {"", "Default"},
+            {"auto", "Auto (Gemini 3)"},
+            {"gemini-3-pro-preview", "Gemini 3 Pro"},
+            {"gemini-3-flash-preview", "Gemini 3 Flash"},
+            {"gemini-2.5-pro", "Gemini 2.5 Pro"},
+            {"gemini-2.5-flash", "Gemini 2.5 Flash"},
+            {"gemini-2.5-flash-lite", "Gemini 2.5 Flash Lite"},
+    };
     /** Used until Antigravity reports its own list (`agy models`, which depends on the plan). */
     static final String[][] AGY = {
             {"", "Default"},
@@ -59,6 +69,7 @@ final class Models {
         if ("opencode".equals(backend)) return withDefault(opencodeLive != null ? opencodeLive : OPENCODE);
         if ("agy".equals(backend)) return withDefault(agyLive != null ? agyLive : AGY);
         if ("grok".equals(backend)) return withDefault(grokLive != null ? grokLive : GROK);
+        if ("gemini".equals(backend)) return withDefault(GEMINI);
         if (!"codex".equals(backend)) return withDefault(CLAUDE);
         return withDefault(codexLive != null ? codexLive : CODEX);
     }
@@ -255,6 +266,7 @@ final class Models {
         if ("codex".equals(backend)) return BestBuddyApp.str(R.string.models_default_codex);
         if ("agy".equals(backend)) return BestBuddyApp.str(R.string.models_default_agy);
         if ("grok".equals(backend)) return BestBuddyApp.str(R.string.models_default_grok);
+        if ("gemini".equals(backend)) return BestBuddyApp.str(R.string.models_default_gemini);
         return BestBuddyApp.str(R.string.models_default_opencode);
     }
 

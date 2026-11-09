@@ -36,29 +36,30 @@ final class Account {
     static final Account OPENCODE = new Account("opencode");
     static final Account AGY = new Account("agy");
     static final Account GROK = new Account("grok");
-    static final Account[] ALL = {CLAUDE, CODEX, OPENCODE, AGY, GROK};
+    static final Account GEMINI = new Account("gemini");
+    static final Account[] ALL = {CLAUDE, CODEX, OPENCODE, AGY, GROK, GEMINI};
     /** The agents offered to the user: Claude Code is not one of them (it needs a paid plan). */
-    static final Account[] OFFERED = {OPENCODE, AGY, GROK, CODEX};
+    static final Account[] OFFERED = {OPENCODE, GEMINI, CODEX, AGY, GROK};
 
     static Account of(String agent) {
         return "codex".equals(agent) ? CODEX : "opencode".equals(agent) ? OPENCODE : "agy".equals(agent) ? AGY
-                : "grok".equals(agent) ? GROK : CLAUDE;
+                : "grok".equals(agent) ? GROK : "gemini".equals(agent) ? GEMINI : CLAUDE;
     }
 
-    /** Is this one of BestBuddy's agents ("claude", "codex", "opencode", "agy" or "grok")? */
+    /** Is this one of BestBuddy's agents ("claude", "codex", "opencode", "agy", "grok" or "gemini")? */
     static boolean known(String agent) {
         return of(agent).agent.equals(agent);
     }
 
-    /** The agent's display name: "Claude Code", "Codex", "OpenCode", "Antigravity" or "Grok". */
+    /** The agent's display name: "Claude Code", "Codex", "OpenCode", "Antigravity", "Grok" or "Gemini CLI". */
     static String nameOf(String agent) {
         return of(agent).name();
     }
 
-    /** Its command-line name, shown in mono labels: "claude-code", "codex", "opencode", "agy" or "grok". */
+    /** Its command-line name, shown in mono labels: "claude-code", "codex", "opencode", "agy", "grok" or "gemini". */
     static String cliOf(String agent) {
         return "codex".equals(agent) ? "codex" : "opencode".equals(agent) ? "opencode" : "agy".equals(agent) ? "agy"
-                : "grok".equals(agent) ? "grok" : "claude-code";
+                : "grok".equals(agent) ? "grok" : "gemini".equals(agent) ? "gemini" : "claude-code";
     }
 
     final String agent;
@@ -111,13 +112,18 @@ final class Account {
         return "grok".equals(agent);
     }
 
-    /** Usable without paying, within limits (OpenCode's free models, Antigravity's and Grok's free plans). */
+    boolean gemini() {
+        return "gemini".equals(agent);
+    }
+
+    /** Usable without paying, within limits (OpenCode's free models, Antigravity's, Grok's and Gemini CLI's free plans). */
     boolean freeTier() {
-        return opencode() || agy() || grok();
+        return opencode() || agy() || grok() || gemini();
     }
 
     String name() {
-        return claude() ? "Claude Code" : opencode() ? "OpenCode" : agy() ? "Antigravity" : grok() ? "Grok" : "Codex";
+        return claude() ? "Claude Code" : opencode() ? "OpenCode" : agy() ? "Antigravity" : grok() ? "Grok"
+                : gemini() ? "Gemini CLI" : "Codex";
     }
 
     /** The plan to show: OpenCode's "free models" marker in the user's language, anything else as it is. */
@@ -128,7 +134,8 @@ final class Account {
     /** One line on what the agent runs on, for pickers. */
     String tagline() {
         return BestBuddyApp.str(claude() ? R.string.account_tagline_claude : opencode() ? R.string.account_tagline_opencode
-                : agy() ? R.string.account_tagline_agy : grok() ? R.string.account_tagline_grok : R.string.account_tagline_codex);
+                : agy() ? R.string.account_tagline_agy : grok() ? R.string.account_tagline_grok
+                : gemini() ? R.string.account_tagline_gemini : R.string.account_tagline_codex);
     }
 
     static void addListener(Listener l) {
@@ -301,6 +308,22 @@ final class Account {
                     } else {
                         set(Step.SIGNED_OUT, "");
                     }
+                } else if (gemini()) {
+                    // signed in = its saved Google login; the account's email is in google_accounts.json
+                    String out = Linux.exec(app, "command -v gemini >/dev/null || { echo NOTINSTALLED; exit 0; }; "
+                            + "[ -s " + GEMINI_CREDS + " ] && echo GEMINI_SIGNED=$(jq -r '.active // empty' "
+                            + GEMINI_ACCOUNTS + " 2>/dev/null); echo VER=$(gemini --version 2>/dev/null)", 60);
+                    version = ver(out);
+                    Matcher signed = Pattern.compile("GEMINI_SIGNED=(\\S*)").matcher(out);
+                    if (out.contains("NOTINSTALLED")) {
+                        set(Step.NEED_INSTALL, "");
+                    } else if (signed.find()) {
+                        email = signed.group(1);
+                        plan = "";
+                        set(Step.SIGNED_IN, "");
+                    } else {
+                        set(Step.SIGNED_OUT, "");
+                    }
                 } else {
                     String out = Linux.exec(app, "command -v codex >/dev/null || { echo NOTINSTALLED; exit 0; }; "
                             + "codex login status 2>&1; echo VER=$(codex --version 2>/dev/null)", 60);
@@ -349,7 +372,7 @@ final class Account {
                     set(Step.INSTALLING, app.getString(R.string.account_installing_tools));
                     String o = Linux.exec(app, "apk update -q && apk add -q bash curl jq libgcc libstdc++ ripgrep git "
                             + "ca-certificates procps coreutils findutils" + (claude() || agy() || grok() ? "" : " nodejs npm")
-                            + (agy() ? " util-linux-misc" : "") // script: Antigravity's sign-in needs a terminal
+                            + (agy() || gemini() ? " util-linux-misc" : "") // script: Antigravity's and Gemini's sign-in need a terminal
                             + " && echo TOOLS_OK", 900);
                     if (!o.contains("TOOLS_OK")) throw new IOException(tail(o));
                 }
@@ -369,6 +392,12 @@ final class Account {
                     // xAI's installer fetches one static binary (it runs on Alpine as it is) and links it in ~/.local/bin
                     String o = Linux.exec(app, "curl -fsSL https://x.ai/cli/install.sh -o /tmp/grok-install.sh"
                             + " && bash /tmp/grok-install.sh 2>&1 | tail -5 && " + GROK_BIN + " --version && echo AGENT_OK", 1800);
+                    if (!o.contains("AGENT_OK")) throw new IOException(tail(o));
+                } else if (gemini()) {
+                    set(Step.INSTALLING, app.getString(R.string.account_downloading, name()));
+                    // Google's agent, from npm: it runs on the Node.js installed above
+                    String o = Linux.exec(app, "npm install -g @google/gemini-cli >/tmp/npm.log 2>&1; tail -5 /tmp/npm.log;"
+                            + " gemini --version && echo AGENT_OK", 1800);
                     if (!o.contains("AGENT_OK")) throw new IOException(tail(o));
                 } else if (opencode()) {
                     set(Step.INSTALLING, app.getString(R.string.account_downloading, name()));
@@ -415,6 +444,10 @@ final class Account {
     private static volatile boolean grokModelsBusy;
     private static volatile long grokModelsAt;
 
+    private static final String GEMINI_CREDS = "/root/.gemini/oauth_creds.json";
+    private static final String GEMINI_ACCOUNTS = "/root/.gemini/google_accounts.json";
+    private static final String GEMINI_SETTINGS = "/root/.gemini/settings.json";
+
     private static String ver(String out) {
         java.util.regex.Matcher m = java.util.regex.Pattern.compile("VER=\\D*(\\d+\\.\\d+\\.\\d+)").matcher(out);
         return m.find() ? m.group(1) : "";
@@ -445,6 +478,9 @@ final class Account {
                     o = Linux.exec(app, AGY_BIN + " update 2>&1 | tail -3; echo VER=$(" + AGY_BIN + " --version)", 900);
                 } else if (grok()) {
                     o = Linux.exec(app, GROK_BIN + " update 2>&1 | tail -3; echo VER=$(" + GROK_BIN + " --version)", 900);
+                } else if (gemini()) {
+                    o = Linux.exec(app, "npm install -g @google/gemini-cli@latest >/tmp/npm.log 2>&1; tail -3 /tmp/npm.log;"
+                            + " echo VER=$(gemini --version)", 1800);
                 } else if (opencode()) {
                     // Reinstalls only when npm has a newer version (1.x counts: OpenCode 2 is a new npm package that
                     // keeps 1.x's connected providers). The install removes the old copy first (OC_REMOVE), so it
@@ -502,6 +538,12 @@ final class Account {
                         ? Linux.builder(app, "/root/.local/bin/claude", "auth", "login", "--claudeai")
                         : agy() ? Linux.builder(app, "/bin/sh", "-c", "command -v script >/dev/null || apk add -q util-linux-misc;"
                                 + " exec script -qec \"" + AGY_BIN + " -p 'Reply with just: ok'\" /dev/null")
+                        : gemini() ? Linux.builder(app, "/bin/sh", "-c", "mkdir -p /root/.gemini;"
+                                + " f=" + GEMINI_SETTINGS + "; [ -s \"$f\" ] || echo '{}' > \"$f\";"
+                                + " jq '.security = ((.security // {}) * {auth:{selectedType:\"oauth-personal\"}})' \"$f\" > \"$f.new\""
+                                + " && mv \"$f.new\" \"$f\";"
+                                + " command -v script >/dev/null || apk add -q util-linux-misc;"
+                                + " NO_BROWSER=true exec script -qec gemini /dev/null")
                         : grok() ? Linux.builder(app, GROK_BIN, "login", "--device-auth")
                         : onOtherDevice ? Linux.builder(app, "codex", "login", "--device-auth")
                         : Linux.builder(app, "codex", "login")).start();
@@ -522,8 +564,23 @@ final class Account {
                     } catch (Exception ignored) {
                     }
                 }).start();
-                boolean device = grok() || onOtherDevice && !claude() && !agy(); // Codex's or Grok's device code
+                if (gemini()) new Thread(() -> {
+                    // the code was accepted: Gemini's REPL is not needed, stop it (the sign-in is saved)
+                    try {
+                        while (p.isAlive()) {
+                            Thread.sleep(2000);
+                            if (step == Step.FINISHING
+                                    && Linux.exec(app, "[ -s " + GEMINI_CREDS + " ] && echo GEMINI_SIGNED", 20).contains("GEMINI_SIGNED")) {
+                                p.destroy();
+                                break;
+                            }
+                        }
+                    } catch (Exception ignored) {
+                    }
+                }).start();
+                boolean device = grok() || onOtherDevice && !claude() && !agy() && !gemini(); // Codex's or Grok's device code
                 Pattern u = Pattern.compile(agy() ? "https://accounts\\.google\\.com/o/oauth2/auth\\?\\S+"
+                        : gemini() ? "https://accounts\\.google\\.com/o/oauth2/v2/auth\\?\\S+"
                         : grok() ? "https://accounts\\.x\\.ai/oauth2/device\\S*"
                         : device ? "https://\\S*/codex/device\\S*" : "https://\\S*/oauth/authorize\\?\\S+");
                 Pattern code = Pattern.compile("one-time code[^\\n]*\\n\\s*([A-Z0-9][A-Z0-9-]{4,15})");
@@ -591,8 +648,8 @@ final class Account {
     synchronized boolean submit(String code) {
         if (loginIn == null || code == null || code.trim().isEmpty()) return false;
         try {
-            // Antigravity reads it on a terminal (see startLogin), where Enter is a carriage return
-            loginIn.write((code.trim() + (agy() ? "\r" : "\n")).getBytes(StandardCharsets.UTF_8));
+            // Antigravity and Gemini read it on a terminal (see startLogin), where Enter is a carriage return
+            loginIn.write((code.trim() + (agy() || gemini() ? "\r" : "\n")).getBytes(StandardCharsets.UTF_8));
             loginIn.flush();
             codeSentAt = System.currentTimeMillis();
             set(Step.FINISHING, BestBuddyApp.str(R.string.signin_finishing));
@@ -612,6 +669,7 @@ final class Account {
         new Thread(() -> {
             try {
                 if (agy()) Linux.exec(app, "rm -f " + AGY_TOKEN, 60); // agy only signs out from its own screen (/logout)
+                else if (gemini()) Linux.exec(app, "rm -f " + GEMINI_CREDS + " " + GEMINI_ACCOUNTS, 60);
                 else if (grok()) Linux.exec(app, GROK_BIN + " logout", 60);
                 else if (!opencode()) Linux.exec(app, claude() ? "claude auth logout" : "codex logout", 60);
             } catch (Exception ignored) {
@@ -628,10 +686,11 @@ final class Account {
     }
 
     /** The confirmation code if this text contains it, else null: Claude's "&lt;code&gt;#&lt;state&gt;", or the Google
-     *  authorization code Antigravity's page shows ("4/0A…"; in the address bar it's URL-encoded, so not matched). */
+     *  authorization code Antigravity's and Gemini's page shows ("4/0A…"; in the address bar it's URL-encoded, so not
+     *  matched). */
     String findCode(CharSequence text) {
         if (text == null) return null;
-        if (agy()) {
+        if (agy() || gemini()) {
             Matcher m = Pattern.compile("(?<![A-Za-z0-9_/-])4/[0-9A-Za-z_-]{30,}").matcher(text);
             return m.find() ? m.group() : null;
         }
@@ -647,9 +706,9 @@ final class Account {
         return !agy();
     }
 
-    /** Signs in with a code pasted from the browser page (Claude Code, Antigravity). */
+    /** Signs in with a code pasted from the browser page (Claude Code, Antigravity, Gemini CLI). */
     boolean pastesCode() {
-        return claude() || agy();
+        return claude() || agy() || gemini();
     }
 
     boolean waitingForCode() {
