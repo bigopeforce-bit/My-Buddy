@@ -88,8 +88,8 @@ public class AppPermissionsActivity extends Screen {
         body.addView(label(getString(R.string.perms_smart_reviewer)), gap(18));
         // a reviewer that isn't signed in is greyed out
         java.util.Set<String> noReviewer = new java.util.HashSet<>();
-        for (String r : new String[]{"claude", "codex"}) if (!SetupState.signedIn(this, r)) noReviewer.add(r);
-        body.addView(segmented(this, new String[][]{{"same", getString(R.string.perms_reviewer_same)}, {"claude", "Claude Code"}, {"codex", "Codex"}},
+        for (String r : new String[]{"codex"}) if (!SetupState.signedIn(this, r)) noReviewer.add(r);
+        body.addView(segmented(this, new String[][]{{"same", getString(R.string.perms_reviewer_same)}, {"codex", "Codex"}},
                 Prefs.reviewer(this), false, v -> {
                     Prefs.setReviewer(this, v);
                     renderApps();
@@ -98,7 +98,7 @@ public class AppPermissionsActivity extends Screen {
         body.addView(text(this, getString(R.string.perms_reviewer_about), 12, MUTED), gap(6));
         body.addView(text(this, getString(R.string.perms_reviewer_rules), 12, MUTED), gap(4));
         // the reviewer's model on each harness that's signed in: quick by default
-        for (final String h : new String[]{"claude", "codex"}) {
+        for (final String h : new String[]{"codex"}) {
             if (!SetupState.signedIn(this, h)) continue;
             String m = Prefs.reviewerModel(this, h);
             LinearLayout r = row(this);

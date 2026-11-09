@@ -1937,7 +1937,7 @@ final class Bubble implements ChatHub.Listener {
         sw.setPaddingRelative(dp(8), dp(4), dp(8), dp(12));
         sessionList.addView(sw, new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
         String def = Prefs.backend(svc);
-        for (Account acc : Account.ALL) {
+        for (Account acc : Account.OFFERED) {
             boolean ready = SetupState.signedIn(svc, acc.agent);
             LinearLayout r = Ui.listRow(svc);
             r.setGravity(Gravity.CENTER_VERTICAL);

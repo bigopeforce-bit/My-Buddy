@@ -56,7 +56,7 @@ public final class ShareActivity extends Screen {
         c.addView(sectionLabel(this, getString(R.string.main_new_chat)));
         String def = Prefs.backend(this);
         c.addView(choice(def, getString(R.string.share_new_chat, Account.of(def).name()), null), full());
-        for (Account acc : Account.ALL) {
+        for (Account acc : Account.OFFERED) {
             if (acc.agent.equals(def) || !SetupState.signedIn(this, acc.agent)) continue;
             c.addView(choice(acc.agent, getString(R.string.share_new_chat, acc.name()), null), full());
         }

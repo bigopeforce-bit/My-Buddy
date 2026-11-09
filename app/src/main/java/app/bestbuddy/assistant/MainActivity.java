@@ -469,7 +469,7 @@ public class MainActivity extends Screen implements ChatHub.Listener, Account.Li
         sw.setPaddingRelative(dp(this, 4), dp(this, 4), dp(this, 4), dp(this, 12));
         c.addView(sw, full());
         String def = Prefs.backend(this);
-        for (Account acc : Account.ALL) {
+        for (Account acc : Account.OFFERED) {
             String[] a = {acc.agent, acc.name(), acc.tagline()};
             // agents that aren't set up are greyed out; tapping one opens its setup instead of a chat
             boolean ready = SetupState.signedIn(this, acc.agent);

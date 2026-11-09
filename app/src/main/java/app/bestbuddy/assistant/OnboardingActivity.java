@@ -127,8 +127,7 @@ public class OnboardingActivity extends Screen implements Account.Listener {
 
     static String[] wanted(Context c) {
         String a = Prefs.agents(c);
-        if ("both".equals(a)) return new String[]{"claude", "codex"};
-        return new String[]{Account.known(a) ? a : "claude"};
+        return new String[]{Account.known(a) ? a : "opencode"};
     }
 
     private void go(int s) {
@@ -264,11 +263,9 @@ public class OnboardingActivity extends Screen implements Account.Listener {
         String cur = Prefs.agents(this);
         String[][] opts = {
                 {"opencode", "OpenCode", getString(R.string.onboarding_brain_opencode)},
-                {"claude", "Claude Code", getString(R.string.onboarding_brain_claude)},
-                {"codex", "Codex", getString(R.string.onboarding_brain_codex)},
                 {"agy", "Antigravity", getString(R.string.onboarding_brain_agy)},
                 {"grok", "Grok", getString(R.string.onboarding_brain_grok)},
-                {"both", "Claude Code + Codex", getString(R.string.onboarding_brain_both)},
+                {"codex", "Codex", getString(R.string.onboarding_brain_codex)},
         };
         for (String[] o : opts) {
             boolean on = o[0].equals(cur);

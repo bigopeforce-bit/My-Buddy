@@ -3,7 +3,7 @@
 <resources>
     <string name="app_name" translatable="false">BestBuddy</string>
     <string name="service_label">BestBuddy assistant</string>
-    <string name="service_description">Shows the BestBuddy chat bubble and lets the agent you choose (Claude Code, Codex, OpenCode, Antigravity or Grok), running inside BestBuddy on this phone, read the screen and tap, type and scroll for you. Nothing leaves the phone except what the agent itself sends to its AI service (Anthropic, OpenAI, Google, xAI or your OpenCode model\'s provider).</string>
+    <string name="service_description">Shows the BestBuddy chat bubble and lets the agent you choose (OpenCode, Antigravity, Grok or Codex), running inside BestBuddy on this phone, read the screen and tap, type and scroll for you. Nothing leaves the phone except what the agent itself sends to its AI service (Anthropic, OpenAI, Google, xAI or your OpenCode model\'s provider).</string>
 
     <!-- ===== First run (OnboardingActivity), the Chats home screen (MainActivity), updates, appearance ===== -->
 
@@ -29,7 +29,7 @@
     <!-- Two example requests a user could type. Translate them naturally and use your language's quotation marks. -->
     <string name="onboarding_welcome_ask_text">\"Reply to Sam that I\'m late\", \"add milk to my basket\".</string>
     <string name="onboarding_welcome_plan_title">Free to start, no API key</string>
-    <string name="onboarding_welcome_plan_text">Starts on OpenCode\'s free models, with no account. Claude Code works with a Claude subscription, Codex with a ChatGPT plan, Antigravity with a Google account and Grok with a Google or X account.</string>
+    <string name="onboarding_welcome_plan_text">Starts on OpenCode\'s free models, with no account. Antigravity works with a Google account, Grok with a Google or X account and Codex with a ChatGPT plan.</string>
     <string name="onboarding_welcome_control_title">You stay in control</string>
     <string name="onboarding_welcome_control_text">Sending, posting, buying and deleting always ask first.</string>
     <!-- Small lowercase mono line under the list. -->
@@ -174,7 +174,7 @@
     <string name="main_section_recent">Recent</string>
     <string name="main_empty_title">No chats yet</string>
     <!-- "New chat" = the button (main_new_chat). -->
-    <string name="main_empty_text">Tap New chat to start one with Claude Code, Codex, OpenCode, Antigravity or Grok. Long-press a chat to delete it.</string>
+    <string name="main_empty_text">Tap New chat to start one with OpenCode, Antigravity, Grok or Codex. Long-press a chat to delete it.</string>
     <!-- Status of a chat with a running task, until the agent reports what it's doing. Small lowercase mono text. -->
     <string name="main_chat_working">working…</string>
     <string name="main_chat_waiting">waiting for you…</string>
@@ -845,7 +845,7 @@
     <!-- Accessibility disclosure, shown before Android's accessibility settings open (required by Google Play) -->
     <string name="ui_a11y_title">How BestBuddy uses accessibility</string>
     <string name="ui_a11y_what">BestBuddy uses Android\'s accessibility service to do what you ask in other apps: it reads what\'s on the screen and taps, types and scrolls for you. It also shows the floating bubble.</string>
-    <string name="ui_a11y_data">While a task runs, the screen content, which can include personal information such as messages, names or addresses, is sent to the AI service of the agent you choose (Anthropic for Claude Code, OpenAI for Codex, Google for Antigravity, xAI for Grok, or your OpenCode model\'s provider), only to carry out your request.</string>
+    <string name="ui_a11y_data">While a task runs, the screen content, which can include personal information such as messages, names or addresses, is sent to the AI service of the agent you choose (OpenAI for Codex, Google for Antigravity, xAI for Grok, or your OpenCode model\'s provider), only to carry out your request.</string>
     <string name="ui_a11y_no_servers">BestBuddy has no servers of its own. It doesn\'t collect, sell or share this data, and doesn\'t use it for ads.</string>
     <string name="ui_a11y_asks">Before anything that sends, posts, buys or deletes, BestBuddy asks for your OK. You can turn the service off anytime in Android\'s accessibility settings.</string>
     <string name="ui_privacy_policy">Privacy policy</string>
@@ -1224,7 +1224,7 @@
     <!-- Which AI agent answers new chats. -->
     <string name="setup_default_brain">Default brain</string>
     <!-- "New chat" is the name of a button in BestBuddy. -->
-    <string name="setup_default_brain_info">Who answers new chats from the bubble or the New chat button. Claude Code uses your Claude plan, Codex your ChatGPT plan, Antigravity your Google account, Grok your Grok account, OpenCode its free models or your own providers. Only agents that are set up can be picked.</string>
+    <string name="setup_default_brain_info">Who answers new chats from the bubble or the New chat button. OpenCode\'s free models need no account or payment; Antigravity uses your Google account, Grok your Grok account and Codex your ChatGPT plan. Only agents that are set up can be picked.</string>
     <!-- Toast. %1$s = agent name. "New chat" is the name of a button in BestBuddy. -->
     <string name="setup_default_brain_set">New chats will use %1$s. You can pick per chat with the New chat button.</string>
     <!-- Toast. %1$s = agent name. -->

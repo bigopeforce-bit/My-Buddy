@@ -46,7 +46,8 @@ final class Prefs {
 
     /** Which agent answers the bubble: "opencode" (default, free), "claude", "codex", "agy" or "grok". */
     static String backend(Context c) {
-        return sp(c).getString("backend", "opencode");
+        String b = sp(c).getString("backend", "opencode");
+        return "claude".equals(b) || "both".equals(b) ? "opencode" : b; // Claude Code is no longer offered
     }
 
     static void setBackend(Context c, String backend) {
@@ -315,7 +316,8 @@ final class Prefs {
 
     /** Which agents the user wants: "claude", "codex", "opencode", "agy", "grok" or "both" (Claude Code and Codex). */
     static String agents(Context c) {
-        return sp(c).getString("agents", "opencode");
+        String a = sp(c).getString("agents", "opencode");
+        return "claude".equals(a) || "both".equals(a) ? "opencode" : a; // Claude Code is no longer offered
     }
 
     static void setAgents(Context c, String a) {
@@ -455,7 +457,8 @@ final class Prefs {
 
     /** Voice input engine: "phone" (Android's recognizer), "claude" (Claude Code's dictation) or "chatgpt". */
     static String voiceEngine(Context c) {
-        return sp(c).getString("voice_engine", "phone");
+        String e = sp(c).getString("voice_engine", "phone");
+        return "claude".equals(e) ? "phone" : e; // Claude's dictation is gone with Claude Code
     }
 
     static void setVoiceEngine(Context c, String e) {

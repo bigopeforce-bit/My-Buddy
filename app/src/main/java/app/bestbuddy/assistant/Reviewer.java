@@ -64,12 +64,8 @@ final class Reviewer {
 
     /** Which harness reviews: the user's choice, "same" meaning the agent that runs this chat. */
     static String harness(Context c, String chatBackend) {
-        String r = Prefs.reviewer(c);
-        if ("same".equals(r)) r = chatBackend != null ? chatBackend : "claude";
-        if (!"codex".equals(r)) r = "claude"; // the reviewer runs on Claude Code or Codex (an OpenCode, Antigravity or Grok chat uses Claude's)
-        // Codex reviews through the ChatGPT session (its plan); Claude Code with its plan or an API key service
-        if (!("codex".equals(r) ? SetupState.planSignedIn(c, r) : SetupState.signedIn(c, r))) r = "claude".equals(r) ? "codex" : "claude";
-        return SetupState.signedIn(c, r) ? r : null;
+        // Codex is the only reviewer left (Claude Code is no longer offered): it reviews through the ChatGPT session.
+        return SetupState.planSignedIn(c, "codex") ? "codex" : null;
     }
 
     static Decision review(Context c, String harness, String request, String note, String action, String screen) {

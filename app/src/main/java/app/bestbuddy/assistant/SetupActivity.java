@@ -331,8 +331,8 @@ public class SetupActivity extends Screen implements Account.Listener, RemoteSes
         TextView brainInfo = text(this, getString(R.string.setup_default_brain_info), 13, MUTED);
         brainInfo.setPaddingRelative(0, dp(this, 2), 0, 0);
         ag.addView(brainInfo);
-        ag.addView(segmented(this, new String[][]{{"claude", "Claude Code"}, {"codex", "Codex"}, {"opencode", "OpenCode"},
-                        {"agy", "Antigravity"}, {"grok", "Grok"}},
+        ag.addView(segmented(this, new String[][]{{"opencode", "OpenCode"}, {"agy", "Antigravity"}, {"grok", "Grok"},
+                        {"codex", "Codex"}},
                 backend, false, v -> {
                     Prefs.setBackend(this, v);
                     Toast.makeText(this, getString(R.string.setup_default_brain_set, Account.nameOf(v)),
@@ -342,7 +342,7 @@ public class SetupActivity extends Screen implements Account.Listener, RemoteSes
                     Toast.makeText(this, getString(R.string.setup_set_up_first, Account.nameOf(v)), Toast.LENGTH_SHORT).show();
                     openAgent(v);
                 }), topGap(12));
-        for (Account a : Account.ALL) ag.addView(agentRow(a.agent), topGap(a == Account.CLAUDE ? 12 : 4));
+        for (Account a : Account.OFFERED) ag.addView(agentRow(a.agent), topGap(a == Account.OPENCODE ? 12 : 4));
         ag.addView(apiKeysRow(), topGap(4));
         ag.addView(skillsRow(), topGap(4));
         ag.addView(navRow(R.drawable.ms_terminal, "GitHub", GitHub.login == null || GitHub.login.isEmpty()
@@ -355,8 +355,8 @@ public class SetupActivity extends Screen implements Account.Listener, RemoteSes
         LinearLayout mcp = card();
         mcp.setPaddingRelative(dp(this, 16), dp(this, 14), dp(this, 16), dp(this, 16));
         mcp.addView(text(this, getString(R.string.setup_phone_tools_info), 14, MUTED));
-        mcp.addView(segmented(this, new String[][]{{"claude", "claude"}, {"codex", "codex"}, {"opencode", "opencode"},
-                        {"agy", "agy"}, {"grok", "grok"}},
+        mcp.addView(segmented(this, new String[][]{{"opencode", "opencode"}, {"agy", "agy"}, {"grok", "grok"},
+                        {"codex", "codex"}},
                 mcpAgent, true, v -> {
                     mcpAgent = v;
                     render();
@@ -410,10 +410,8 @@ public class SetupActivity extends Screen implements Account.Listener, RemoteSes
         String engine = Prefs.voiceEngine(this);
         // Claude's dictation needs Claude Code signed in, ChatGPT's voice needs Codex: otherwise greyed out
         java.util.Set<String> noVoice = new java.util.HashSet<>();
-        if (!SetupState.planSignedIn(this, "claude")) noVoice.add("claude");
         if (!SetupState.planSignedIn(this, "codex")) noVoice.add("chatgpt");
-        vc.addView(segmented(this, new String[][]{{"phone", getString(R.string.setup_voice_phone)}, {"claude", "Claude"},
-                        {"chatgpt", "ChatGPT"}},
+        vc.addView(segmented(this, new String[][]{{"phone", getString(R.string.setup_voice_phone)}, {"chatgpt", "ChatGPT"}},
                 engine, false, v -> {
                     Prefs.setVoiceEngine(this, v);
                     render();
@@ -494,47 +492,6 @@ public class SetupActivity extends Screen implements Account.Listener, RemoteSes
         // ------------------------------------------------------- remote control
         list.addView(sectionLabel(this, getString(R.string.setup_remote_control)));
         LinearLayout rcc = card();
-        boolean claudeIn = SetupState.planSignedIn(this, "claude");
-        rcc.addView(switchRow(this, getString(R.string.setup_remote_session), getString(R.string.setup_remote_session_info),
-                Prefs.remoteSession(this), on -> {
-            if (on && !claudeIn) {
-                Toast.makeText(this, R.string.setup_remote_sign_in_first, Toast.LENGTH_LONG).show();
-                render();
-                return;
-            }
-            Prefs.setRemoteSession(this, on);
-            if (on) RemoteSession.ensure(this);
-            else RemoteSession.stop();
-            render();
-        }), full());
-        if (Prefs.remoteSession(this)) {
-            LinearLayout st = row(this);
-            st.setPaddingRelative(dp(this, 16), 0, dp(this, 16), dp(this, 14));
-            RemoteSession.State rs = RemoteSession.state;
-            st.addView(dot(this, rs == RemoteSession.State.ACTIVE ? OK : rs == RemoteSession.State.ERROR ? ERR : ACCENT, 8));
-            TextView stt = monoText(this, rs == RemoteSession.State.ACTIVE
-                    ? getString(R.string.setup_remote_active, Prefs.remoteName(this))
-                    : rs == RemoteSession.State.ERROR ? RemoteSession.detail
-                    : getString(rs == RemoteSession.State.STARTING ? R.string.setup_remote_starting
-                    : R.string.setup_remote_stopped), 12,
-                    rs == RemoteSession.State.ERROR ? ERR : MUTED);
-            stt.setPaddingRelative(dp(this, 8), 0, 0, 0);
-            st.addView(stt, weight1());
-            rcc.addView(st, full());
-            if (rs == RemoteSession.State.ACTIVE && RemoteSession.url != null) {
-                Button open = button(this, getString(R.string.setup_remote_open), false);
-                open.setOnClickListener(v -> {
-                    try {
-                        startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(RemoteSession.url)));
-                    } catch (Exception e) {
-                        Toast.makeText(this, R.string.setup_remote_open_failed, Toast.LENGTH_SHORT).show();
-                    }
-                });
-                LinearLayout.LayoutParams op = wrap();
-                op.setMargins(dp(this, 16), 0, dp(this, 16), dp(this, 14));
-                rcc.addView(open, op);
-            }
-        }
         // a Codex session for the ChatGPT app (CodexRemote)
         rcc.addView(divider(), lineParams());
         boolean codexIn = SetupState.planSignedIn(this, "codex");
@@ -1208,12 +1165,12 @@ public class SetupActivity extends Screen implements Account.Listener, RemoteSes
     }
 
     /** Which agent the "phone tools in your own sessions" command is for. */
-    private String mcpAgent = "claude";
+    private String mcpAgent = "opencode";
 
     /** Agents that can't answer chats yet (not installed or not signed in): greyed out in pickers. */
     private java.util.Set<String> notReady() {
         java.util.Set<String> s = new java.util.HashSet<>();
-        for (Account a : Account.ALL) if (!SetupState.signedIn(this, a.agent)) s.add(a.agent);
+        for (Account a : Account.OFFERED) if (!SetupState.signedIn(this, a.agent)) s.add(a.agent);
         return s;
     }
 
