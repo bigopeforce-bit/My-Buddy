@@ -27,6 +27,8 @@ final class Face {
     /** Longest side of the saved picture, in px: sharp at the bubble's 60dp on any screen. */
     private static final int SIDE = 256;
     private static Bitmap picture; // decoded once, dropped when a new picture is saved
+    private static Bitmap logo; // the app's own logo, decoded once
+    private static Bitmap bubbleFor;
     private static Drawable bubble;
     private static boolean loaded;
 
@@ -48,6 +50,14 @@ final class Face {
         return picture;
     }
 
+    /** The face to draw: the user's picture while "Your picture" is on, else the app's own logo. */
+    static synchronized Bitmap face(Context c) {
+        Bitmap p = picture(c);
+        if (p != null) return p;
+        if (logo == null) logo = BitmapFactory.decodeResource(c.getResources(), R.drawable.logo_face);
+        return logo;
+    }
+
     /** Is a picture saved (whether or not it's in use)? */
     static boolean saved(Context c) {
         return file(c).length() > 0;
@@ -58,12 +68,12 @@ final class Face {
      * own), {@code picture} for a picture, which is trimmed to its edges and often detailed.
      */
     static int size(Context c, int buddy, int picture) {
-        return picture(c) != null ? picture : buddy;
+        return face(c) != null ? picture : buddy;
     }
 
     /** Shows BestBuddy's face in an avatar or tile: the picked picture, else the drawing {@code res}. */
     static void set(ImageView v, int res) {
-        Bitmap b = picture(v.getContext());
+        Bitmap b = face(v.getContext());
         if (b != null) v.setImageBitmap(b);
         else v.setImageResource(res);
     }
@@ -73,9 +83,12 @@ final class Face {
      * face (as the drawn face gets one from its outline), so the shadow doesn't make the picture smaller.
      */
     static synchronized Drawable bubble(Context c) {
-        Bitmap b = picture(c);
+        Bitmap b = face(c);
         if (b == null) return null;
-        if (bubble == null) bubble = new Shadowed(b);
+        if (bubble == null || bubbleFor != b) {
+            bubble = new Shadowed(b);
+            bubbleFor = b;
+        }
         return bubble;
     }
 
@@ -183,6 +196,7 @@ final class Face {
         }
         synchronized (Face.class) {
             loaded = false; // read again on next use
+            bubble = null;
         }
     }
 }
