@@ -71,6 +71,11 @@ final class Sessions {
         boolean quietRun, quietSaid;
         /** Linux tools: the agent may run commands and edit files in ~/.buddy/work (buddy-run's dev). Never on Play. */
         boolean dev;
+        /**
+         * Auto-approve: this chat's agent goes ahead without asking for routine actions (sending, posting, steps in
+         * apps). Money, settings, installs, passwords and BestBuddy's own screens still ask (see Guard.autoApprove).
+         */
+        boolean autoApprove;
         /** Long-task mode: the screen stays on while this chat works, and its end is a notification (see KeepAwake). */
         boolean awake;
         /** Pinned to the top of the chat list. */
@@ -322,6 +327,7 @@ final class Sessions {
         JSONObject o = new JSONObject().put("id", s.id).put("backend", s.backend).put("title", s.title).put("model", s.model)
                 .put("effort", s.effort).put("actual_model", s.actualModel).put("ctx_used", s.ctxUsed).put("ctx_window", s.ctxWindow)
                 .put("interrupted", s.interrupted).put("incognito", s.incognito).put("dev", s.dev).put("awake", s.awake)
+                .put("auto_approve", s.autoApprove)
                 .put("pinned", s.pinned).put("archived", s.archived).put("updated", s.updated).put("messages", msgs);
         if (s.schedule != null) {
             JSONArray ok;
@@ -352,6 +358,7 @@ final class Sessions {
         // a chat from before Linux tools were per chat gets what the one switch in Settings gave every chat
         older[0] |= !o.has("dev");
         s.dev = o.optBoolean("dev", Prefs.devMode(app));
+        s.autoApprove = o.optBoolean("auto_approve");
         s.awake = o.optBoolean("awake");
         s.pinned = o.optBoolean("pinned");
         s.archived = o.optBoolean("archived");

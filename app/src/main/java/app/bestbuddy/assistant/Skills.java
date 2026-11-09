@@ -1,6 +1,7 @@
 package app.bestbuddy.assistant;
 
 import android.content.Context;
+import android.content.res.AssetManager;
 import android.net.Uri;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
@@ -165,8 +166,36 @@ final class Skills {
         return n;
     }
 
-    private static byte[] readAll(InputStream in) throws Exception {
-        ByteArrayOutputStream o = new ByteArrayOutputStream();
+    /**
+     * Installs a skill from the bundled catalog (see SkillsCatalog): copies assets/skills/&lt;name&gt;/ into
+     * ~/.agents/skills/&lt;name&gt;, replacing files it already has. Returns its name.
+     */
+    static String installAsset(Context c, String name) throws Exception {
+        boolean known = false;
+        for (String n : SkillsCatalog.ORDER) if (n.equals(name)) known = true;
+        if (!known || SkillsCatalog.read(c, name) == null) throw new IllegalArgumentException(c.getString(R.string.skills_bad_file));
+        copyAsset(c.getAssets(), "skills/" + name, new File(dir(c), name));
+        return name;
+    }
+
+    private static void copyAsset(AssetManager am, String path, File out) throws Exception {
+        String[] kids = am.list(path);
+        if (kids != null && kids.length > 0) {
+            out.mkdirs();
+            if (!out.isDirectory()) throw new IllegalArgumentException(path);
+            for (String k : kids) copyAsset(am, path + "/" + k, new File(out, k));
+            return;
+        }
+        File parent = out.getParentFile();
+        if (parent != null) parent.mkdirs();
+        try (InputStream in = am.open(path); FileOutputStream f = new FileOutputStream(out)) {
+            byte[] buf = new byte[64 * 1024];
+            int n;
+            while ((n = in.read(buf)) > 0) f.write(buf, 0, n);
+        }
+    }
+
+    private static byte[] readAll(InputStream in) throws Exception {        ByteArrayOutputStream o = new ByteArrayOutputStream();
         byte[] buf = new byte[64 * 1024];
         int n;
         while ((n = in.read(buf)) > 0) o.write(buf, 0, n);

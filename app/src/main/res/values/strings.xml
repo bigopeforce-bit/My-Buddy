@@ -505,6 +505,24 @@
     <string name="chat_allowed_remove">Remove %1$s</string>
     <!-- A line in the chat for an action that went ahead because of "Allowed without asking"; %1$s = the action, e.g. Tap “Complete Task” in Testers Community. -->
     <string name="run_rule_approved">Approved by your run rule: %1$s</string>
+    <!-- Chip beside the model chip in a chat: auto-approve. Keep short. -->
+    <string name="chat_auto">Auto</string>
+    <!-- Read by TalkBack for that chip when auto-approve is on. -->
+    <string name="chat_auto_on">Auto-approve is on: the agent goes ahead without asking, except for money, settings and installs</string>
+    <!-- As above, when it is off. -->
+    <string name="chat_auto_off">Auto-approve is off: the agent asks before anything risky</string>
+    <!-- Switch in Chat options. -->
+    <string name="chat_auto_switch">Auto-approve everything</string>
+    <!-- Under that switch. -->
+    <string name="chat_auto_info">The agent goes ahead without asking in this chat: sending, posting and routine steps. Money, payments, passwords, settings, app installs and BestBuddy\'s own screens still ask you.</string>
+    <!-- A line in the chat when auto-approve is turned on. -->
+    <string name="hub_auto_on">Auto-approve is on: the agent goes ahead without asking, except for money, settings and installs.</string>
+    <!-- As above, when it is turned off. -->
+    <string name="hub_auto_off">Auto-approve is off: the agent asks before anything risky.</string>
+    <!-- A line in the chat for an action that went ahead because auto-approve is on; %1$s = the action. -->
+    <string name="auto_approve_note">Auto-approved: %1$s</string>
+    <!-- The answer an agent gets when auto-approve lets its confirm through. -->
+    <string name="auto_approve_answer">APPROVED automatically: the user turned on auto-approve for this chat. Go ahead with this, and only this. Paying, buying, deleting, installing, passwords and security settings still need their own approval.</string>
     <!-- Notification title when a long-task chat's run ends; %1$s = the agent's name (Claude Code, Codex…). -->
     <string name="run_end_done">%1$s finished</string>
     <!-- As above, when the user stopped it. -->
@@ -2010,6 +2028,12 @@
     <string name="skills_exists">There\'s already a skill called %1$s.</string>
     <string name="skills_bad_file">That\'s not a skill: it needs a SKILL.md with a name.</string>
     <string name="skills_slash_none">No skill by that name. Tap to add skills.</string>
+    <string name="skills_installed_section">Your skills</string>
+    <string name="skills_discover">Discover</string>
+    <string name="skills_discover_info">Ready-made skills, written for a phone. Tap Install and the agents can use one in their next task, or when you pick it with / in a chat.</string>
+    <string name="skills_install">Install</string>
+    <string name="skills_installed">Installed</string>
+    <string name="skills_installed_toast">Installed /%1$s. The agents can use it now.</string>
     <string name="github_row_none">Let agents push to your repositories</string>
     <string name="github_intro">Sign in to GitHub for the Linux tools: BestBuddy installs git and the GitHub CLI in its Linux, signs them in to your account, and sets git to your name and private noreply email.</string>
     <string name="github_risk">Agents in chats with Linux tools can then clone, commit and push with your account, and open issues and pull requests. They\'re told to ask you first before anything they push or post.</string>

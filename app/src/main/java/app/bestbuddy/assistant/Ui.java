@@ -297,6 +297,26 @@ final class Ui {
         chip.setSelected(on); // for TalkBack: on reads as selected
     }
 
+    /** The "Auto" chip beside a chat's Linux tools chip: a check and the name (see paintAutoChip). */
+    static LinearLayout autoChip(Context c) {
+        LinearLayout l = row(c);
+        l.setPaddingRelative(dp(c, 10), dp(c, 5), dp(c, 12), dp(c, 5));
+        l.addView(icon(c, R.drawable.ms_check, MUTED, 14));
+        TextView t = single(monoText(c, c.getString(R.string.chat_auto), 12, MUTED));
+        t.setPaddingRelative(dp(c, 4), 0, 0, 0);
+        l.addView(t);
+        return l;
+    }
+
+    /** As paintLinuxChip: accent when the chat's agent goes ahead without asking. */
+    static void paintAutoChip(Context c, LinearLayout chip, boolean on) {
+        int color = on ? ACCENT_TEXT : MUTED;
+        ((ImageView) chip.getChildAt(0)).setImageTintList(ColorStateList.valueOf(color));
+        ((TextView) chip.getChildAt(1)).setTextColor(color);
+        chip.setBackground(on ? rounded(c, ACCENT_SOFT, 16) : outlined(c, 0x00000000, 16, OUTLINE, 1));
+        chip.setSelected(on);
+    }
+
     /** A red note with a warning icon (what could go wrong with a setting). */
     static LinearLayout warning(Context c, String s) {
         LinearLayout w = row(c);

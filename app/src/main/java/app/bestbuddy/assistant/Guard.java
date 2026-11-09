@@ -410,6 +410,17 @@ final class Guard {
     }
 
     /**
+     * Auto-approve: the user turned it on for this chat, and this app is one it may cover (see allowable). Then a
+     * risky tap goes ahead without a card, as in an app the user trusts. Never in a notification rule's run, and never
+     * for an app the user listed as always asking (Tools checks that first).
+     */
+    static boolean autoApprove(android.content.Context c, String pkg) {
+        String chat = McpServer.CALLER_CHAT.get();
+        if (chat == null || Triggers.ruleRun(chat) || !allowable(c, pkg)) return false;
+        return ChatHub.get(c).autoApprove(chat);
+    }
+
+    /**
      * The calling chat's run rule: the user allowed this app without asking until the run ends (ChatHub.allowedFor).
      * It covers only what a notification rule's countdown may approve (sending a message) and a smart reviewer's
      * "ask" on a tap that isn't a risky button; Tools decides which an action is. Never in a notification rule's run.

@@ -2,8 +2,8 @@ package app.bestbuddy.assistant;
 
 /** Single source of the app version; read by build.sh and app/build.gradle.kts. */
 final class BuildInfo {
-    static final String VERSION = "1.6";
-    static final int VERSION_CODE = 7;
+    static final String VERSION = "1.7";
+    static final int VERSION_CODE = 8;
 
     private BuildInfo() {
     }

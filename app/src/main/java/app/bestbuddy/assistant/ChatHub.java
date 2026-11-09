@@ -346,6 +346,23 @@ final class ChatHub {
         changed();
     }
 
+    /** Turn a chat's auto-approve on or off; the next action uses it (see Guard.autoApprove). */
+    void setAutoApprove(Sessions.Session ses, boolean on) {
+        ses.autoApprove = on;
+        sessions.save(ses);
+        add(ses, Bubble.Kind.STEP, app.getString(on ? R.string.hub_auto_on : R.string.hub_auto_off));
+        changed();
+    }
+
+    /** Is auto-approve on for a chat (any thread)? False outside BestBuddy's chats. */
+    boolean autoApprove(String chat) {
+        if (chat == null) return false;
+        for (Sessions.Session s : new ArrayList<>(sessions.all)) {
+            if (s.id.equals(chat)) return s.autoApprove;
+        }
+        return false;
+    }
+
     /**
      * Set or remove (null) a chat's scheduled task, and its alarm with it. Removing it also ends the "Allowed without
      * asking" apps kept for it (a running chat keeps them until its run ends, as any chat).

@@ -424,8 +424,10 @@ final class Tools {
                             + "buying, deleting, installing, passwords and security settings still need their OK.");
                 }
                 String answer = svc.askConfirm(summary, true);
-                // covers the next risky tap (after a rule's countdown, only a send)
-                if (answer.startsWith("APPROVED")) Guard.approved(a.getString("summary"), answer.equals(BestBuddyService.AUTO_APPROVED));
+                // covers the next risky tap (after a rule's countdown or auto-approve, only a send)
+                boolean auto = answer.equals(BestBuddyService.AUTO_APPROVED)
+                        || answer.equals(svc.getString(R.string.auto_approve_answer));
+                if (answer.startsWith("APPROVED")) Guard.approved(a.getString("summary"), auto);
                 return text(answer);
             }
             case "ask": {
@@ -1427,13 +1429,15 @@ final class Tools {
         if ("trust".equals(mode)) return null;
         String label = Guard.buttonLabel(target);
         String app = svc.foregroundAppName();
+        boolean userAsks = Guard.listed(svc, "ask", label, pkg);
+        // auto-approve: as in an app the user trusts, but never for an app they listed as always asking
+        if (!userAsks && Guard.autoApprove(svc, pkg)) return null;
         Guard.remember(svc, label, pkg, app);
         if (!ruleRun() && Guard.listed(svc, "allow", label, pkg)) return null; // the user said: never ask for this one
         AccessibilityNodeInfo field = findFocusedInput();
         CharSequence draft = field == null || field.isShowingHintText() ? null : field.getText();
         String what = "Tap “" + (label == null ? "this" : label) + "”"; // for the agent and the reviewer
         java.util.function.Function<String, String> card = in -> tapCard(label, in); // the same, on the user's card
-        boolean userAsks = Guard.listed(svc, "ask", label, pkg);
         boolean ask = userAsks
                 || (Prefs.guardBuiltin(svc) && (Guard.riskyLabel(target) != null || (hit != null && Guard.riskyLabel(hit) != null)));
         // the run rule covers a button that only sends, and not one the user listed as always asking
@@ -1559,13 +1563,16 @@ final class Tools {
             }
         }
         if (a.optBoolean("submit")) {
-            String mode = mode(str(target.getPackageName()));
+            String pkg = str(target.getPackageName());
+            String mode = mode(pkg);
             java.util.function.Function<String, String> card = in -> in == null ? svc.getString(R.string.tools_card_enter)
                     : svc.getString(R.string.tools_card_enter_in, in);
             // Hard always asks; Smart lets the reviewer decide, as for a tap the rules don't catch
             boolean send = !Guard.moneyApp(svc, target.getPackageName());
-            String blocked = "hard".equals(mode) ? guardAction("Press Enter to send", card, text, send,
-                    send && !target.isPassword() && Guard.runRule(svc, str(target.getPackageName())))
+            boolean auto = !target.isPassword() && Guard.autoApprove(svc, pkg);
+            String blocked = auto ? null
+                    : "hard".equals(mode) ? guardAction("Press Enter to send", card, text, send,
+                    send && !target.isPassword() && Guard.runRule(svc, pkg))
                     : "smart".equals(mode) ? review("Press Enter to send", card, target, text) : null;
             if (blocked != null) return result + " Not sent: " + blocked;
             Thread.sleep(150);

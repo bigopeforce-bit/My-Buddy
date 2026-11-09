@@ -314,18 +314,21 @@ Linux tools are off in this chat: no shell commands or file edits. If the user a
 (building an app, running commands), tell them to turn on Linux tools with the chip under this chat's title, then ask again."
 fi
 
-# Buddy's shared skills (Settings, Skills) live in ~/.agents/skills, where Codex and OpenCode look: Claude Code gets a
-# link to each in its own folder (a skill of the same name already there wins), and links to removed ones go.
+# Buddy's shared skills (Settings, Skills) live in ~/.agents/skills, where Codex and OpenCode look. Gemini CLI reads
+# its own ~/.gemini/skills and Claude Code ~/.claude/skills: each gets a link to every skill (one already there wins),
+# and links to removed ones go.
 link_skills() {
-  local d n l
-  mkdir -p "$HOME/.claude/skills"
-  for d in "$HOME"/.agents/skills/*/; do
-    [ -f "$d/SKILL.md" ] || continue
-    n=$(basename "$d")
-    [ -e "$HOME/.claude/skills/$n" ] || [ -L "$HOME/.claude/skills/$n" ] || ln -s "${d%/}" "$HOME/.claude/skills/$n"
-  done
-  for l in "$HOME"/.claude/skills/*; do
-    [ -L "$l" ] && [ ! -e "$l" ] && rm -f "$l"
+  local d n l dir
+  for dir in "$HOME/.claude/skills" "$HOME/.gemini/skills"; do
+    mkdir -p "$dir"
+    for d in "$HOME"/.agents/skills/*/; do
+      [ -f "$d/SKILL.md" ] || continue
+      n=$(basename "$d")
+      [ -e "$dir/$n" ] || [ -L "$dir/$n" ] || ln -s "${d%/}" "$dir/$n"
+    done
+    for l in "$dir"/*; do
+      [ -L "$l" ] && [ ! -e "$l" ] && rm -f "$l"
+    done
   done
   return 0
 }
@@ -741,6 +744,7 @@ GEMINI_TOOLS_RULE='["run_shell_command","replace","write_file","read_file","read
 run_gemini() {
   local h=$S/gemini-home g=$HOME/.gemini f ex
   mkdir -p "$h/.gemini" "$g/tmp"
+  link_skills
   for f in "$g"/* "$g"/.[!.]*; do
     [ -e "$f" ] || continue
     case "${f##*/}" in settings.json|GEMINI.md) continue ;; esac

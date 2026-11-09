@@ -781,6 +781,15 @@ public class BestBuddyService extends AccessibilityService implements McpServer.
     String askConfirm(final String summary, boolean canAuto) throws InterruptedException {
         final String chat = McpServer.CALLER_CHAT.get();
         boolean rule = Triggers.ruleRun(chat);
+        // auto-approve for this chat: no card, except for money, installs, passwords and settings (routineText)
+        if (!rule && chat != null && Guard.routineText(summary) && ChatHub.get(this).autoApprove(chat)) {
+            main.post(() -> {
+                ChatHub hub = ChatHub.get(this);
+                Sessions.Session s = hub.sessions.find(chat);
+                if (s != null) hub.note(s, Bubble.Kind.STEP, getString(R.string.auto_approve_note, summary));
+            });
+            return getString(R.string.auto_approve_answer);
+        }
         int cd = canAuto ? Triggers.countdown(chat) : 0;
         String shown = summary;
         if (cd > 0) { // a second agent checks it against the rule first; if it objects, the card waits for the user

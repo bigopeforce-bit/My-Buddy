@@ -34,6 +34,8 @@ public class ChatActivity extends Screen implements ChatHub.Listener, Browser.Li
     private UsageGauge usage;
     /** The Linux tools chip beside the model chip. */
     private LinearLayout linux;
+    /** The chat's auto-approve chip (beside Linux tools): on = the agent goes ahead without asking. */
+    private LinearLayout auto;
     /** The empty-chat hint, while the chat has no messages. */
     private TextView hint;
     private Button mic;
@@ -103,6 +105,11 @@ public class ChatActivity extends Screen implements ChatHub.Listener, Browser.Li
         LinearLayout.LayoutParams lp = wrap();
         lp.setMarginStart(dp(this, 6));
         chips.addView(linux, lp);
+        auto = protect(autoChip(this)); // only the user switches auto-approve
+        auto.setOnClickListener(v -> hub.setAutoApprove(ses, !ses.autoApprove));
+        LinearLayout.LayoutParams aup = wrap();
+        aup.setMarginStart(dp(this, 6));
+        chips.addView(auto, aup);
         LinearLayout.LayoutParams cp = wrap();
         cp.topMargin = dp(this, 3);
         titles.addView(chips, cp);
@@ -624,6 +631,10 @@ public class ChatActivity extends Screen implements ChatHub.Listener, Browser.Li
     private void chatOptions() {
         LinearLayout c = protect(column(this)); // only the user changes these, as with the Linux tools chip
         c.addView(title(this, getString(R.string.chat_options), 18));
+        LinearLayout aa = switchRow(this, getString(R.string.chat_auto_switch), getString(R.string.chat_auto_info),
+                ses.autoApprove, on -> hub.setAutoApprove(ses, on));
+        aa.setPaddingRelative(dp(this, 4), dp(this, 12), dp(this, 4), dp(this, 12));
+        c.addView(aa, full());
         LinearLayout sw = switchRow(this, getString(R.string.chat_keep_awake), getString(R.string.chat_keep_awake_info),
                 ses.awake, on -> hub.setAwake(ses, on));
         sw.setPaddingRelative(dp(this, 4), dp(this, 12), dp(this, 4), dp(this, 12));
@@ -1222,7 +1233,11 @@ public class ChatActivity extends Screen implements ChatHub.Listener, Browser.Li
         usage.setContentDescription(Usage.shortLine(this, ses.backend));
         usage.setVisibility(used < 0 ? View.GONE : View.VISIBLE);
         if (linux != null) paintLinuxChip(this, linux, ses.dev);
-        options.setImageTintList(ColorStateList.valueOf(ses.awake || ses.schedule != null || !ses.allowed.isEmpty() ? ACCENT : MUTED));
+        if (auto != null) {
+            paintAutoChip(this, auto, ses.autoApprove);
+            auto.setContentDescription(getString(ses.autoApprove ? R.string.chat_auto_on : R.string.chat_auto_off));
+        }
+        options.setImageTintList(ColorStateList.valueOf(ses.autoApprove || ses.awake || ses.schedule != null || !ses.allowed.isEmpty() ? ACCENT : MUTED));
         if (hint != null) hint.setText(hintText());
         strip.setVisibility(ses.running ? View.VISIBLE : View.GONE);
         input.setHint(ses.running ? getString(R.string.chat_input_hint_running) : getString(R.string.chat_input_hint, ses.brainName()));

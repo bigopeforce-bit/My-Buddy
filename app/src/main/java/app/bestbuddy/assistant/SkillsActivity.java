@@ -64,9 +64,10 @@ public class SkillsActivity extends Screen {
             body.addView(text(this, getString(R.string.skills_need_linux), 15, TEXT), gap(18));
             return;
         }
+        body.addView(heading(getString(R.string.skills_installed_section)), gap(18));
         List<Skills.Skill> all = Skills.all(this);
-        if (all.isEmpty()) body.addView(text(this, getString(R.string.skills_none), 15, TEXT), gap(18));
-        for (int i = 0; i < all.size(); i++) body.addView(skillRow(all.get(i)), gap(i == 0 ? 14 : 4));
+        if (all.isEmpty()) body.addView(text(this, getString(R.string.skills_none), 15, TEXT), gap(10));
+        for (int i = 0; i < all.size(); i++) body.addView(skillRow(all.get(i)), gap(i == 0 ? 8 : 4));
         LinearLayout btns = row(this);
         Button imp = button(this, getString(R.string.skills_import), all.isEmpty());
         imp.setOnClickListener(v -> startActivityForResult(new Intent(Intent.ACTION_OPEN_DOCUMENT)
@@ -78,7 +79,95 @@ public class SkillsActivity extends Screen {
         wp.setMarginStart(dp(this, 8));
         btns.addView(write, wp);
         body.addView(btns, gap(14));
-        body.addView(text(this, getString(R.string.skills_how), 13, MUTED), gap(12));
+        body.addView(heading(getString(R.string.skills_discover)), gap(24));
+        body.addView(text(this, getString(R.string.skills_discover_info), 13, MUTED), gap(4));
+        List<SkillsCatalog.Item> cat = SkillsCatalog.all(this);
+        for (int i = 0; i < cat.size(); i++) {
+            body.addView(discoverRow(cat.get(i), Skills.find(this, cat.get(i).name) != null), gap(i == 0 ? 12 : 6));
+        }
+        body.addView(text(this, getString(R.string.skills_how), 13, MUTED), gap(18));
+    }
+
+    private TextView heading(String s) {
+        TextView t = text(this, s, 13, MUTED);
+        t.setTypeface(sans(this, 600));
+        return t;
+    }
+
+    /** One bundled skill: its name and when to use it, and Install (or a check once it's in). */
+    private LinearLayout discoverRow(SkillsCatalog.Item it, boolean installed) {
+        LinearLayout r = row(this);
+        r.setPaddingRelative(dp(this, 14), dp(this, 12), dp(this, 10), dp(this, 12));
+        r.setBackground(outlined(this, CARD, 16, OUTLINE, 1));
+        r.addView(icon(this, R.drawable.ms_auto_awesome, ACCENT_TEXT, 20));
+        LinearLayout t = column(this);
+        t.setPaddingRelative(dp(this, 12), 0, dp(this, 10), 0);
+        t.addView(single(title(this, it.title, 15)));
+        TextView d = text(this, it.description, 12, MUTED);
+        d.setMaxLines(2);
+        d.setEllipsize(android.text.TextUtils.TruncateAt.END);
+        t.addView(d);
+        r.addView(t, weight1());
+        if (installed) {
+            LinearLayout done = row(this);
+            done.addView(icon(this, R.drawable.ms_check, ACCENT_TEXT, 16));
+            TextView dl = text(this, getString(R.string.skills_installed), 12, ACCENT_TEXT);
+            dl.setPaddingRelative(dp(this, 4), 0, dp(this, 6), 0);
+            done.addView(dl);
+            r.addView(done);
+        } else {
+            Button b = button(this, getString(R.string.skills_install), true);
+            b.setTextSize(13);
+            b.setMinHeight(dp(this, 36));
+            b.setMinimumHeight(dp(this, 36));
+            b.setPaddingRelative(dp(this, 16), 0, dp(this, 16), 0);
+            b.setOnClickListener(v -> install(it));
+            r.addView(b);
+        }
+        r.setOnClickListener(v -> {
+            if (installed) {
+                Skills.Skill s = Skills.find(this, it.name);
+                if (s != null) showSkill(s);
+            } else {
+                showDiscover(it);
+            }
+        });
+        return r;
+    }
+
+    /** What a bundled skill does, before installing it. */
+    private void showDiscover(SkillsCatalog.Item it) {
+        LinearLayout c = column(this);
+        c.addView(title(this, it.title, 18));
+        c.addView(text(this, it.description, 13, MUTED), gap(4));
+        String md = SkillsCatalog.read(this, it.name);
+        String bodyText = md == null ? "" : Skills.frontMatter(md)[2];
+        if (bodyText.length() > 2500) bodyText = bodyText.substring(0, 2500) + "…";
+        TextView b = monoText(this, bodyText, 12, TEXT);
+        b.setBackground(rounded(this, BG, 12));
+        b.setPaddingRelative(dp(this, 12), dp(this, 10), dp(this, 12), dp(this, 10));
+        b.setTextIsSelectable(true);
+        c.addView(b, gap(12));
+        Button in = button(this, getString(R.string.skills_install), true);
+        LinearLayout.LayoutParams ip = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(this, 50));
+        ip.topMargin = dp(this, 14);
+        c.addView(in, ip);
+        Dialog d = bottomSheet(this, protect(c));
+        in.setOnClickListener(v -> {
+            d.dismiss();
+            install(it);
+        });
+        d.show();
+    }
+
+    private void install(SkillsCatalog.Item it) {
+        try {
+            String n = Skills.installAsset(this, it.name);
+            Toast.makeText(this, getString(R.string.skills_installed_toast, n), Toast.LENGTH_LONG).show();
+            render();
+        } catch (Exception e) {
+            Toast.makeText(this, e.getMessage(), Toast.LENGTH_LONG).show();
+        }
     }
 
     private LinearLayout skillRow(Skills.Skill s) {
