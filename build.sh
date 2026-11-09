@@ -6,8 +6,8 @@ cd "$(dirname "$0")"
 
 SDK_JAR=${SDK_JAR:-$HOME/android-sdk/android-36/android.jar}
 KEYSTORE=${KEYSTORE:-$HOME/.buddy-keys/release.jks}
-PACKAGE=app.buddy.assistant
-INFO=app/src/main/java/app/buddy/assistant/BuildInfo.java
+PACKAGE=app.bestbuddy.assistant
+INFO=app/src/main/java/app/bestbuddy/assistant/BuildInfo.java
 VERSION_NAME=$(sed -n 's/.*VERSION = "\(.*\)";/\1/p' "$INFO")
 VERSION_CODE=$(sed -n 's/.*VERSION_CODE = \([0-9]*\);/\1/p' "$INFO")
 SRC=app/src/main
@@ -62,7 +62,7 @@ if [ ! -f "$KEYSTORE" ]; then
   printf '%s' "$PASS" > "$(dirname "$KEYSTORE")/password"
   chmod 600 "$(dirname "$KEYSTORE")/password"
   keytool -genkeypair -keystore "$KEYSTORE" -alias buddy -keyalg RSA -keysize 4096 -validity 10000 \
-    -storepass "$PASS" -keypass "$PASS" -dname "CN=Buddy, O=Personal" >/dev/null 2>&1
+    -storepass "$PASS" -keypass "$PASS" -dname "CN=BestBuddy, O=Personal" >/dev/null 2>&1
 fi
 apksigner sign --ks "$KEYSTORE" --ks-key-alias buddy \
   --ks-pass "file:$(dirname "$KEYSTORE")/password" \

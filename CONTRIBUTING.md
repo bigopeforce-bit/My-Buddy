@@ -1,4 +1,4 @@
-# Contributing to Buddy
+# Contributing to BestBuddy
 
 Thanks for helping. Bug reports, ideas and translation fixes are all welcome. Features and bug fixes are built in the project itself, so please open an issue for them rather than a pull request.
 
@@ -18,7 +18,7 @@ There are two flavors: `github` (the release on GitHub, which updates itself) an
 
 ## Translations
 
-Buddy's English text is in `app/src/main/res/values/strings.xml`, and each language has its own `values-<code>/strings.xml`. The first translations were made with AI, so corrections from native speakers are very welcome.
+BestBuddy's English text is in `app/src/main/res/values/strings.xml`, and each language has its own `values-<code>/strings.xml`. The first translations were made with AI, so corrections from native speakers are very welcome.
 
 - **Fix a translation:** edit that language's file and open a pull request.
 - **Add a language:** copy `values/strings.xml` to `values-<code>/strings.xml`, translate it (leave out entries marked `translatable="false"`) and add the code to `res/xml/locales_config.xml`, so it shows up in Android's per-app language setting.
@@ -27,7 +27,7 @@ Buddy's English text is in `app/src/main/res/values/strings.xml`, and each langu
 
 ## License
 
-Buddy is [Apache-2.0](LICENSE). By opening a pull request with a translation you agree that it is released under the same license.
+BestBuddy is [Apache-2.0](LICENSE). By opening a pull request with a translation you agree that it is released under the same license.
 
 ## Project layout
 
@@ -43,16 +43,16 @@ Buddy is [Apache-2.0](LICENSE). By opening a pull request with a translation you
 | `.../ChatHub.java`, `Sessions.java` | Chat state shared by the app and the bubble |
 | `.../Rules.java`, `RulesActivity.java`, `NotificationWatcher.java`, `Triggers.java`, `Waiting.java`, `WaitingActivity.java` | Notification rules: the rules and their screen, notification access, the runs they start, and the replies waiting for your OK |
 | `.../Ui.java`, `Theme.java` | Components and the light/dark/accent theme |
-| `.../Linux.java` | Buddy's Linux: downloads Alpine and runs commands through proot |
+| `.../Linux.java` | BestBuddy's Linux: downloads Alpine and runs commands through proot |
 | `.../Helper.java` | Runs `buddy-run` inside Linux and keeps its files up to date |
 | `.../Account.java`, `SignInActivity.java` | Install, one-tap sign-in and status for Claude Code, Codex, OpenCode, Antigravity and Grok |
 | `.../RemoteSession.java` | The Remote Control session |
 | `.../CodexRemote.java` | The Codex session: runs `linux/codex-remote` and passes on pairing requests |
-| `.../SshServer.java` | SSH from Termux: the server in Buddy's Linux and the one-time code that lets a key in |
-| `app/src/main/res/values/strings.xml` | Every text Buddy shows, in English; `values-<language>/` holds the translations |
+| `.../SshServer.java` | SSH from Termux: the server in BestBuddy's Linux and the one-time code that lets a key in |
+| `app/src/main/res/values/strings.xml` | Every text BestBuddy shows, in English; `values-<language>/` holds the translations |
 | `app/src/main/jniLibs/arm64-v8a/` | proot and its libraries (see [third_party](third_party/README.md)) |
 | `linux/buddy-run` | Runs the agent with the phone tools and streams events back |
 | `linux/codex-remote` | Codex's app-server with remote control and the phone tools; makes pairing codes in the same proot |
-| `linux/system-prompt.md` | Buddy's instructions for the agent |
+| `linux/system-prompt.md` | BestBuddy's instructions for the agent |
 | `linux/android-app/` | The developer-mode skill: toolchain setup and `build-apk.sh` |
 | `app/src/main/assets/linux` | Symlink to `linux/`, so the helper ships inside the APK |

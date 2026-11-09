@@ -1,4 +1,4 @@
-package app.buddy.assistant;
+package app.bestbuddy.assistant;
 
 /** The GitHub build: updates itself from GitHub releases. */
 final class Flavor {
