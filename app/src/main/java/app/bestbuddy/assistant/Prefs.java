@@ -226,7 +226,7 @@ final class Prefs {
 
     /** Accent colour (opaque ARGB). */
     static int accent(Context c) {
-        return sp(c).getInt("accent", 0xFF7C5CE0);
+        return sp(c).getInt("accent", 0xFF3D6FE0);
     }
 
     static void setAccent(Context c, int color) {
@@ -235,7 +235,7 @@ final class Prefs {
 
     /** Surface style: "warm", "neutral" or "black" (black applies in dark mode only). */
     static String surface(Context c) {
-        return sp(c).getString("surface", "warm");
+        return sp(c).getString("surface", "neutral");
     }
 
     static void setSurface(Context c, String s) {

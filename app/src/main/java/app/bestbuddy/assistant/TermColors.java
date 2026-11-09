@@ -2,7 +2,7 @@ package app.bestbuddy.assistant;
 
 /** The terminal's palette (follows BestBuddy's light/dark mode and accent) and character widths. */
 final class TermColors {
-    static int DEFAULT_FG = 0xFFE6E1D8, DEFAULT_BG = 0xFF151311, CURSOR = 0xFF7C5CE0, SELECTION = 0x557C5CE0;
+    static int DEFAULT_FG = 0xFFE6E1D8, DEFAULT_BG = 0xFF151311, CURSOR = 0xFF3D6FE0, SELECTION = 0x553D6FE0;
     /** 16 base colours: a soft modern palette, readable on the background. */
     static final int[] PALETTE = new int[256];
 
@@ -16,7 +16,7 @@ final class TermColors {
     };
 
     static {
-        apply(true, 0xFF7C5CE0);
+        apply(true, 0xFF3D6FE0);
     }
 
     private TermColors() {

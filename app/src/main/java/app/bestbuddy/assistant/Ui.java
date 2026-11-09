@@ -31,15 +31,15 @@ import java.util.Map;
 final class Ui {
     // Palette: filled by Theme.load() from the appearance settings (dark/light, accent, surface).
     static int BG = 0xFF171513, CARD = 0xFF24211E, CARD2 = 0xFF3A3632, TEXT = 0xFFF4EFE6, MUTED = 0xFFA39E95,
-            ACCENT = 0xFF7C5CE0, OK = 0xFF5CC08A, USER = 0xFF4A3A2E, ERR = 0xFFE58A7A,
+            ACCENT = 0xFF3D6FE0, OK = 0xFF5CC08A, USER = 0xFF4A3A2E, ERR = 0xFFE58A7A,
             ON_ACCENT = 0xFF1A1714,   // text on ACCENT
-            ACCENT_TEXT = 0xFF7C5CE0, // accent used as text on BG/CARD (darker in light mode)
+            ACCENT_TEXT = 0xFF3D6FE0, // accent used as text on BG/CARD (darker in light mode)
             NAV = 0xFF1E1B19,         // bottom nav background
             CODE = 0xFF0F0E0D,        // terminal/code block background
             CODE_TEXT = 0xFFF4EFE6,
             LINE = 0x0FF4EFE6,        // dividers
             OUTLINE = 0x1FF4EFE6,     // chip/input borders
-            ACCENT_SOFT = 0x297C5CE0,
+            ACCENT_SOFT = 0x243D6FE0,
             ERR_SOFT = 0x1FE58A7A;
     static boolean DARK = true;
 
@@ -194,22 +194,23 @@ final class Ui {
         b.setAllCaps(false);
         b.setSingleLine(true);
         b.setTextColor(primary ? ON_ACCENT : TEXT);
-        b.setTextSize(TypedValue.COMPLEX_UNIT_SP, 14);
+        b.setTextSize(TypedValue.COMPLEX_UNIT_SP, 15);
         b.setTypeface(sans(c, 600));
-        b.setPaddingRelative(dp(c, 16), dp(c, 8), dp(c, 16), dp(c, 8));
-        b.setMinHeight(dp(c, 40));
-        b.setMinimumHeight(dp(c, 40));
+        b.setPaddingRelative(dp(c, 22), dp(c, 10), dp(c, 22), dp(c, 10));
+        b.setMinHeight(dp(c, 46));
+        b.setMinimumHeight(dp(c, 46));
         b.setMinWidth(0);
         b.setMinimumWidth(0);
         b.setStateListAnimator(null);
-        b.setBackground(rounded(c, primary ? ACCENT : CARD2, 12));
+        b.setBackground(rounded(c, primary ? ACCENT : CARD2, 23));
+        if (primary) b.setElevation(dp(c, 1));
         return b;
     }
 
     static Button outlinedButton(Context c, String label, int color) {
         Button b = button(c, label, false);
         b.setTextColor(color);
-        b.setBackground(outlined(c, 0x00000000, 12, Theme.withAlpha(color, 0x80), 1));
+        b.setBackground(outlined(c, 0x00000000, 23, Theme.withAlpha(color, 0x66), 1));
         return b;
     }
 
@@ -240,12 +241,12 @@ final class Ui {
 
     // ------------------------------------------------------------- components
 
-    /** 12sp/600 muted ALL CAPS label; padding 20/16/20/4. */
+    /** 13sp/600 muted label in sentence case; padding 20/16/20/4. */
     static TextView sectionLabel(Context c, String s) {
-        TextView t = text(c, s.toUpperCase(locale(c)), 12, MUTED);
+        TextView t = text(c, s, 13, MUTED);
         t.setTypeface(sans(c, 600));
-        t.setLetterSpacing(0.06f);
-        t.setPaddingRelative(dp(c, 20), dp(c, 16), dp(c, 20), dp(c, 4));
+        t.setLetterSpacing(0.01f);
+        t.setPaddingRelative(dp(c, 20), dp(c, 18), dp(c, 20), dp(c, 6));
         return t;
     }
 
@@ -258,16 +259,16 @@ final class Ui {
                 claude ? ACCENT_TEXT : TEXT);
         t.setTypeface(mono(c, 600));
         t.setGravity(Gravity.CENTER);
-        t.setBackground(rounded(c, claude ? ACCENT_SOFT : CARD2, 12));
-        t.setLayoutParams(new LinearLayout.LayoutParams(dp(c, 40), dp(c, 40)));
+        t.setBackground(rounded(c, claude ? ACCENT_SOFT : CARD2, 14));
+        t.setLayoutParams(new LinearLayout.LayoutParams(dp(c, 42), dp(c, 42)));
         return t;
     }
 
     /** Outlined mono chip with a trailing expand icon. */
     static LinearLayout chip(Context c, String s) {
         LinearLayout l = row(c);
-        l.setPaddingRelative(dp(c, 8), dp(c, 3), dp(c, 4), dp(c, 3));
-        l.setBackground(outlined(c, 0x00000000, 8, OUTLINE, 1));
+        l.setPaddingRelative(dp(c, 12), dp(c, 5), dp(c, 6), dp(c, 5));
+        l.setBackground(outlined(c, 0x00000000, 16, OUTLINE, 1));
         TextView t = single(monoText(c, s, 12, MUTED));
         l.addView(t, new LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT, 1)); // a chip short of room shortens its text, not the icon
@@ -279,7 +280,7 @@ final class Ui {
     /** The "Linux tools" chip beside a chat's model chip: a terminal icon and the name (see paintLinuxChip). */
     static LinearLayout linuxChip(Context c) {
         LinearLayout l = row(c);
-        l.setPaddingRelative(dp(c, 6), dp(c, 3), dp(c, 8), dp(c, 3));
+        l.setPaddingRelative(dp(c, 10), dp(c, 5), dp(c, 12), dp(c, 5));
         l.addView(icon(c, R.drawable.ms_terminal, MUTED, 14));
         TextView t = single(monoText(c, c.getString(R.string.chat_linux_tools), 12, MUTED));
         t.setPaddingRelative(dp(c, 4), 0, 0, 0);
@@ -292,7 +293,7 @@ final class Ui {
         int color = on ? ACCENT_TEXT : MUTED;
         ((ImageView) chip.getChildAt(0)).setImageTintList(ColorStateList.valueOf(color));
         ((TextView) chip.getChildAt(1)).setTextColor(color);
-        chip.setBackground(on ? rounded(c, ACCENT_SOFT, 8) : outlined(c, 0x00000000, 8, OUTLINE, 1));
+        chip.setBackground(on ? rounded(c, ACCENT_SOFT, 16) : outlined(c, 0x00000000, 16, OUTLINE, 1));
         chip.setSelected(on); // for TalkBack: on reads as selected
     }
 
@@ -876,6 +877,7 @@ final class Ui {
         LinearLayout bar = row(a);
         bar.setBackgroundColor(NAV);
         bar.setGravity(Gravity.CENTER);
+        bar.setElevation(dp(a, 8));
         Object[][] items = {
                 {R.drawable.ms_chat_bubble, a.getString(R.string.ui_nav_chats), MainActivity.class},
                 {R.drawable.ms_terminal, a.getString(R.string.ui_nav_sessions), MonitorActivity.class},
@@ -888,8 +890,8 @@ final class Ui {
             it.setGravity(Gravity.CENTER_HORIZONTAL);
             it.setPaddingRelative(0, dp(a, 10), 0, dp(a, 10));
             FrameLayout pill = new FrameLayout(a);
-            pill.setBackground(on ? rounded(a, Theme.withAlpha(ACCENT, 0x2E), 16) : null);
-            ImageView ic = icon(a, (Integer) items[i][0], on ? TEXT : MUTED, 22);
+            pill.setBackground(on ? rounded(a, ACCENT_SOFT, 16) : null);
+            ImageView ic = icon(a, (Integer) items[i][0], on ? ACCENT_TEXT : MUTED, 22);
             pill.addView(ic, new FrameLayout.LayoutParams(dp(a, 22), dp(a, 22), Gravity.CENTER));
             if (i == NAV_SESSIONS && sessionsBadge > 0) {
                 TextView b = monoText(a, String.valueOf(sessionsBadge), 10, 0xFFFFFFFF);
@@ -904,7 +906,7 @@ final class Ui {
                 pill.addView(b, bp);
             }
             it.addView(pill, new LinearLayout.LayoutParams(dp(a, 60), dp(a, 32)));
-            TextView label = text(a, (String) items[i][1], 12, on ? TEXT : MUTED);
+            TextView label = text(a, (String) items[i][1], 11, on ? ACCENT_TEXT : MUTED);
             label.setTypeface(sans(a, on ? 600 : 500));
             label.setPaddingRelative(0, dp(a, 4), 0, 0);
             label.setGravity(Gravity.CENTER);

@@ -933,7 +933,7 @@ public class SetupActivity extends Screen implements Account.Listener, RemoteSes
         int current = Prefs.accent(this);
         boolean preset = false;
         for (String[] a : Theme.accents(this)) {
-            int col = Theme.parse(a[0], 0xFF7C5CE0);
+            int col = Theme.parse(a[0], 0xFF3D6FE0);
             boolean on = col == current;
             preset |= on;
             r.addView(swatch(col, on, 0, a[1], v -> {

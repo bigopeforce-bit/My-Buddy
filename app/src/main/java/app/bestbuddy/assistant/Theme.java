@@ -13,8 +13,8 @@ import android.view.Window;
  */
 final class Theme {
     static final String[][] ACCENTS = {
-            {"#7C5CE0", "Violet"}, {"#4F8BFF", "Ocean"}, {"#3FB98A", "Mint"},
-            {"#D97757", "Coral"}, {"#E5678F", "Rose"}, {"#E0A43A", "Amber"},
+            {"#3D6FE0", "Ocean"}, {"#7C5CE0", "Violet"}, {"#12B886", "Mint"},
+            {"#E8734A", "Coral"}, {"#E5678F", "Rose"}, {"#D9A03A", "Amber"},
     };
     static final String[][] SURFACES = {{"warm", "Warm"}, {"neutral", "Neutral"}, {"black", "Black"}};
     static final String[][] MODES = {{"system", "System"}, {"light", "Light"}, {"dark", "Dark"}};
@@ -26,7 +26,7 @@ final class Theme {
 
     /** {@link #ACCENTS} with the colour names in the user's language (the labels above are English). */
     static String[][] accents(Context c) {
-        return labeled(c, ACCENTS, R.string.prefs_accent_violet, R.string.prefs_accent_ocean, R.string.prefs_accent_mint,
+        return labeled(c, ACCENTS, R.string.prefs_accent_ocean, R.string.prefs_accent_violet, R.string.prefs_accent_mint,
                 R.string.prefs_accent_coral, R.string.prefs_accent_rose, R.string.prefs_accent_amber);
     }
 
@@ -66,35 +66,35 @@ final class Theme {
 
         if (dark) {
             switch (surface) {
-                case "neutral":
-                    set(0xFF141414, 0xFF222222, 0xFF383838, 0xFF1C1C1C, 0xFF0B0B0B);
+                case "warm":
+                    set(0xFF171513, 0xFF24211E, 0xFF3A3632, 0xFF1E1B19, 0xFF0F0E0D);
                     break;
                 case "black":
-                    set(0xFF000000, 0xFF161514, 0xFF2C2A28, 0xFF0A0A0A, 0xFF000000);
+                    set(0xFF000000, 0xFF0D1119, 0xFF1A2230, 0xFF000000, 0xFF000000);
                     break;
-                default: // warm, the original palette
-                    set(0xFF171513, 0xFF24211E, 0xFF3A3632, 0xFF1E1B19, 0xFF0F0E0D);
+                default: // neutral: BestBuddy's own deep-navy palette
+                    set(0xFF080E18, 0xFF111A28, 0xFF1B2740, 0xFF0C1420, 0xFF05090F);
             }
-            Ui.TEXT = 0xFFF4EFE6;
-            Ui.MUTED = 0xFFA39E95;
-            Ui.OK = 0xFF5CC08A;
-            Ui.ERR = 0xFFE58A7A;
+            Ui.TEXT = 0xFFE9EFF9;
+            Ui.MUTED = 0xFF93A2B8;
+            Ui.OK = 0xFF35C98A;
+            Ui.ERR = 0xFFF0736F;
             Ui.USER = blend(accent, Ui.BG, 0.24f);
         } else {
-            if ("neutral".equals(surface)) set(0xFFF5F5F4, 0xFFFFFFFF, 0xFFE7E7E5, 0xFFEFEFEE, 0xFF1C1C1C);
-            else set(0xFFF7F3EE, 0xFFFFFFFF, 0xFFECE5DD, 0xFFF1EBE4, 0xFF24211E);
-            Ui.TEXT = 0xFF221E1A;
-            Ui.MUTED = 0xFF6F675F;
-            Ui.OK = 0xFF2F9E66;
-            Ui.ERR = 0xFFC5483A;
-            Ui.USER = blend(accent, Ui.CARD, 0.2f);
+            if ("warm".equals(surface)) set(0xFFF7F3EE, 0xFFFFFFFF, 0xFFECE5DD, 0xFFF1EBE4, 0xFF24121E);
+            else set(0xFFF4F7FC, 0xFFFFFFFF, 0xFFE8EEF9, 0xFFFFFFFF, 0xFF0A1222);
+            Ui.TEXT = 0xFF0E1A2B;
+            Ui.MUTED = 0xFF5F6F86;
+            Ui.OK = 0xFF12A66A;
+            Ui.ERR = 0xFFD93A3F;
+            Ui.USER = blend(accent, Ui.CARD, 0.16f);
         }
         Ui.ACCENT = accent;
         Ui.ON_ACCENT = luminance(accent) > 0.45 ? 0xFF1A1714 : 0xFFFFFFFF;
         Ui.ACCENT_TEXT = dark ? accent : darken(accent, luminance(accent) > 0.45 ? 0.62f : 0.85f);
-        Ui.LINE = withAlpha(Ui.TEXT, 0x10);
+        Ui.LINE = withAlpha(Ui.TEXT, 0x14);
         Ui.OUTLINE = withAlpha(Ui.TEXT, 0x22);
-        Ui.ACCENT_SOFT = withAlpha(accent, 0x29);
+        Ui.ACCENT_SOFT = withAlpha(accent, 0x24);
         Ui.ERR_SOFT = withAlpha(Ui.ERR, 0x1F);
         Ui.CODE_TEXT = 0xFFF4EFE6; // the code block stays dark in both modes
         Ui.DARK = dark;
