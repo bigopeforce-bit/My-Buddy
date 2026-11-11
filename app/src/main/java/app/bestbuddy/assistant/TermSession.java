@@ -5,6 +5,8 @@ import android.os.Handler;
 import android.os.Looper;
 import android.os.ParcelFileDescriptor;
 
+import app.buddy.assistant.Pty;
+
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
