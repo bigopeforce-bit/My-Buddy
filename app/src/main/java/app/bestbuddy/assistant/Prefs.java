@@ -675,4 +675,40 @@ final class Prefs {
     static void setAutoSwitch(Context c, boolean on) {
         sp(c).edit().putBoolean("auto_switch", on).apply();
     }
+
+    /** The model an agent uses to plan a task ("" = the chat's own model), when it runs two models. */
+    static String planModel(Context c, String agent) {
+        return sp(c).getString("plan_model_" + agent, "");
+    }
+
+    static void setPlanModel(Context c, String agent, String model) {
+        sp(c).edit().putString("plan_model_" + agent, model == null ? "" : model.trim()).apply();
+    }
+
+    /** The model an agent uses to carry the task out ("" = the chat's own model). */
+    static String executeModel(Context c, String agent) {
+        return sp(c).getString("execute_model_" + agent, "");
+    }
+
+    static void setExecuteModel(Context c, String agent, String model) {
+        sp(c).edit().putString("execute_model_" + agent, model == null ? "" : model.trim()).apply();
+    }
+
+    /** The backup models a chat tries when its own model fails, as JSON (an array of model ids). */
+    static String fallbacks(Context c, String agent) {
+        return sp(c).getString("fallbacks_" + agent, "[]");
+    }
+
+    static void setFallbacks(Context c, String agent, String json) {
+        sp(c).edit().putString("fallbacks_" + agent, json).apply();
+    }
+
+    /** Run two models: the plan one for the first turn of a task, the execute one for the rest. */
+    static boolean dualModels(Context c) {
+        return sp(c).getBoolean("dual_models", false);
+    }
+
+    static void setDualModels(Context c, boolean on) {
+        sp(c).edit().putBoolean("dual_models", on).apply();
+    }
 }

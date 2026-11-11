@@ -112,6 +112,10 @@ final class Sessions {
         String failure = "";
         /** How many models this chat has switched to by itself after a failure (at most a few). */
         int switches;
+        /** The models this chat has already tried (the backup chain goes through them once). */
+        final java.util.Set<String> triedModels = java.util.Collections.synchronizedSet(new java.util.LinkedHashSet<>());
+        /** The first turn of the task has run: the ones after it carry the task out (see Models.planModel). */
+        boolean planUsed;
 
         Session(String id, String backend) {
             this.id = id;
@@ -332,6 +336,7 @@ final class Sessions {
                 .put("effort", s.effort).put("actual_model", s.actualModel).put("ctx_used", s.ctxUsed).put("ctx_window", s.ctxWindow)
                 .put("interrupted", s.interrupted).put("incognito", s.incognito).put("dev", s.dev).put("awake", s.awake)
                 .put("auto_approve", s.autoApprove)
+                .put("plan_used", s.planUsed)
                 .put("pinned", s.pinned).put("archived", s.archived).put("updated", s.updated).put("messages", msgs);
         if (s.schedule != null) {
             JSONArray ok;
@@ -363,6 +368,7 @@ final class Sessions {
         older[0] |= !o.has("dev");
         s.dev = o.optBoolean("dev", Prefs.devMode(app));
         s.autoApprove = o.optBoolean("auto_approve");
+        s.planUsed = o.optBoolean("plan_used");
         s.awake = o.optBoolean("awake");
         s.pinned = o.optBoolean("pinned");
         s.archived = o.optBoolean("archived");

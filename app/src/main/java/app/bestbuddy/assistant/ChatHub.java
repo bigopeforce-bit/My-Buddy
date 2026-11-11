@@ -266,12 +266,13 @@ final class ChatHub {
         try {
             // a rule's run works for someone else's message: no shell, files or web, even with Linux tools on
             Helper.run(app, "ask", ses.id, ses.backend, rule ? "rule" : devArg(ses), forAgent,
-                    model(ses), hasFiles ? android.text.TextUtils.join(",", files) : "", ses.effort);
+                    runModel(ses), hasFiles ? android.text.TextUtils.join(",", files) : "", ses.effort);
         } catch (Exception e) {
             return e.getMessage();
         }
         ses.interrupted = false;
         if (!scheduled && !rule) ses.archived = false; // the user writing in an archived chat brings it back
+        ses.planUsed = true; // the first turn planned; the ones after it carry the task out
         sessions.add(ses, Bubble.Kind.USER, text, hasFiles ? new ArrayList<>(files) : null);
         Sessions.Msg um = ses.messages.get(ses.messages.size() - 1);
         if (scheduled) {
@@ -339,9 +340,11 @@ final class ChatHub {
         if (!Prefs.autoSwitch(app) || ses.switches >= 3 || ses.scheduledRun) return;
         if (!modelFailed(error)) return;
         String now = Models.effective(ses);
-        String next = Models.nextFallback(ses.backend, now);
+        String next = Models.nextFallback(ses.backend, now, ses.triedModels);
         if (next.isEmpty() || next.equals(now)) return;
         ses.switches++;
+        ses.triedModels.add(now);
+        ses.triedModels.add(next);
         ses.model = next;
         sessions.save(ses);
         add(ses, Bubble.Kind.STEP, app.getString(R.string.hub_model_switched, Models.label(ses.backend, now),
@@ -349,7 +352,7 @@ final class ChatHub {
         String last = lastMessage(ses);
         if (!last.isEmpty()) {
             try {
-                Helper.run(app, "ask", ses.id, ses.backend, devArg(ses), last, model(ses), "", ses.effort);
+                Helper.run(app, "ask", ses.id, ses.backend, devArg(ses), last, runModel(ses), "", ses.effort);
                 startRun(ses);
                 ses.status = app.getString(R.string.hub_thinking);
             } catch (Exception e) {
@@ -747,6 +750,20 @@ final class ChatHub {
         if (!eff.isEmpty() || !"opencode".equals(ses.backend)) return eff;
         String plan = Account.OPENCODE.plan;
         return plan.isEmpty() || plan.equals("free models") ? "opencode/big-pickle" : "";
+    }
+
+    /**
+     * The model this run uses. With two models set (Settings → Models & providers), the chat's first turn plans with
+     * the plan model and every turn after it carries the task out with the execute model. A model the user picked for
+     * the chat itself always wins.
+     */
+    private static String runModel(Sessions.Session ses) {
+        if (!ses.model.isEmpty()) return model(ses);
+        String plan = Models.planModel(ses.backend);
+        if (plan.isEmpty()) return model(ses);
+        if (!ses.planUsed) return plan;
+        String exec = Models.executeModel(ses.backend);
+        return exec.isEmpty() ? model(ses) : exec;
     }
 
     /** A note that arrived too late for the run: becomes the next message (already shown in the chat). */

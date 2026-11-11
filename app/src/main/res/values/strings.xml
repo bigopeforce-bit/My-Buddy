@@ -2145,4 +2145,36 @@
     <string name="providers_auto_switch_info">When a model fails or is gone, the chat tries another one by itself.</string>
     <!-- A chat whose model failed and the one it tried instead (see ChatHub.autoSwitch). -->
     <string name="hub_model_switched">%1$s did not answer. Trying %2$s instead.</string>
+    <!-- Settings → Models & providers: the agent, its model, the plan/execute pair and the backup models. -->
+    <string name="models_title">Models &amp; providers</string>
+    <string name="models_subtitle">Connections, models and fallback routing</string>
+    <string name="models_about">Connections, models and fallback routing</string>
+    <string name="models_manage_providers">Manage providers</string>
+    <string name="models_manage_providers_info">Add connections, sign in and choose models</string>
+    <string name="models_dual_title">Separate plan and execute models</string>
+    <string name="models_dual_info">Configure models for dual planning. When activated from chat, planning runs with the plan model and execution runs with the execute model.</string>
+    <string name="models_plan_model">Plan model</string>
+    <string name="models_execute_model">Execute model</string>
+    <string name="models_dual_switch">Use two models</string>
+    <string name="models_dual_switch_info">The first turn of a task plans with the plan model; the turns after it carry the task out with the execute model.</string>
+    <string name="models_now_title">Current configuration</string>
+    <string name="models_now_model">Model</string>
+    <string name="models_now_thinking">Thinking</string>
+    <string name="models_now_window">Context window · Code</string>
+    <string name="models_now_permission">Default permission</string>
+    <string name="models_permission_full">Full access</string>
+    <string name="models_permission_ask">Ask first</string>
+    <string name="models_thinking_off">Off</string>
+    <string name="models_now_hint">Model and thinking change from the chat header.</string>
+    <string name="models_fallbacks_title">Fallbacks</string>
+    <string name="models_fallbacks_none">No default chain</string>
+    <string name="models_fallbacks_count">%1$d backup models, in the order they are tried</string>
+    <string name="models_fallbacks_set">Set backup models</string>
+    <string name="models_fallbacks_info">The models a chat tries when its own model fails, in the order they are set here.</string>
+    <string name="models_fallbacks_empty">No models to choose from yet.</string>
+    <string name="models_own_default">The agent\'s own default</string>
+    <string name="models_own_default_info">What the agent picks by itself</string>
+    <string name="models_picker_info">The agent\'s own models, then each API key service\'s.</string>
+    <string name="models_type_id_hint">Or type a model id, e.g. kilo-auto/free</string>
+    <string name="models_type_id_use">Use</string>
 </resources>

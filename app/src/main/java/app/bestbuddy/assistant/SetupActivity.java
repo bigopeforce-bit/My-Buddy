@@ -350,6 +350,7 @@ public class SetupActivity extends Screen implements Account.Listener, RemoteSes
                     openAgent(v);
                 }), topGap(12));
         for (Account a : Account.OFFERED) ag.addView(agentRow(a.agent), topGap(a == Account.OPENCODE ? 12 : 4));
+        ag.addView(modelsRow(), topGap(4));
         ag.addView(providersRow(), topGap(4));
         ag.addView(apiKeysRow(), topGap(4));
         ag.addView(skillsRow(), topGap(4));
@@ -1266,6 +1267,16 @@ public class SetupActivity extends Screen implements Account.Listener, RemoteSes
         r.addView(icon(this, R.drawable.ms_chevron_right, MUTED, 22));
         r.setOnClickListener(v -> openAgent(agent));
         return r;
+    }
+
+    /** Settings → Models & providers: the agent's model, the plan/execute pair and the backup models. */
+    private View modelsRow() {
+        String agent = Prefs.backend(this);
+        String model = Models.agentDefault(agent);
+        int fallbacks = Models.fallbacks(agent).size();
+        return navRow(R.drawable.ms_tune, getString(R.string.models_title),
+                model.isEmpty() ? getString(R.string.models_own_default) : model,
+                !model.isEmpty() || fallbacks > 0, ModelsActivity.class);
     }
 
     /** Settings → Providers: the agents and the API key services, and which of their models the chats may use. */

@@ -169,16 +169,31 @@ final class Models {
     }
 
     /**
-     * The model to try when the chat's one failed: the next in the same provider's list, then the next provider's first
-     * model, then the agent's own next model. "" when there is nothing to try (see ChatHub.autoSwitch).
+     * The model to try when the chat's one failed: the user's backup chain first (the one after the current), then the
+     * next in the same provider's list, then the next provider's first model, then the agent's own next model.
+     * "" when there is nothing to try (see ChatHub.autoSwitch).
      */
-    static String nextFallback(String backend, String current) {
+    static String nextFallback(String backend, String current, java.util.Set<String> tried) {
+        // the backup models the user set, in their order
+        java.util.List<String> chain = fallbacks(backend);
+        int at = chain.indexOf(current);
+        for (int i = at + 1; i < chain.size(); i++) {
+            if (tried == null || !tried.contains(chain.get(i))) return chain.get(i);
+        }
+        if (at < 0) {
+            for (String m : chain) {
+                if (!m.equals(current) && (tried == null || !tried.contains(m))) return m;
+            }
+        }
         Providers.P p = Providers.of(current);
         if (p != null) { // a service's model: the next one in that service, then another service
             java.util.List<String> ids = new java.util.ArrayList<>();
             for (String[] m : providerModels(Providers.apiId(p.id))) ids.add(m[0]);
-            int at = ids.indexOf(Providers.model(current));
-            for (int i = at + 1; i < ids.size(); i++) return Providers.ref(p, ids.get(i));
+            int i = ids.indexOf(Providers.model(current));
+            for (int j = i + 1; j < ids.size(); j++) {
+                String ref = Providers.ref(p, ids.get(j));
+                if (tried == null || !tried.contains(ref)) return ref;
+            }
             for (Providers.P q : Providers.enabled()) {
                 if (q.id.equals(p.id) || !q.fits(backend)) continue;
                 java.util.List<String[]> m = providerModels(Providers.apiId(q.id));
@@ -189,18 +204,60 @@ final class Models {
         // the agent's own model: the next one in its list ("" is its default, the first entry)
         java.util.List<String> own = new java.util.ArrayList<>();
         for (String[] m : forBackend(backend)) own.add(m[0]);
-        int at = own.indexOf(current);
-        for (int i = at + 1; i < own.size(); i++) if (!own.get(i).isEmpty()) return own.get(i);
+        int k = own.indexOf(current);
+        for (int j = k + 1; j < own.size(); j++) {
+            if (!own.get(j).isEmpty() && (tried == null || !tried.contains(own.get(j)))) return own.get(j);
+        }
         return "";
     }
 
-    /** What a chat on Default uses with this agent: "" (its plan's default) or "@service/model". */
+    /** What a chat on Default uses with this agent: "" (its plan's default), "@service/model" or one of its own models. */
     static String agentDefault(String backend) {
         String d = Prefs.agentDefault(BestBuddyApp.context(), backend);
+        if (!d.startsWith("@")) return d; // one of the agent's own models, the user's own pick (e.g. kilo-auto/free)
         Providers.P p = Providers.of(d);
         if (p == null || !p.fits(backend)) return "";
         String m = Providers.model(d);
         return Providers.ref(p, m.isEmpty() ? p.defaultModel() : m);
+    }
+
+    /** The model this agent plans with ("" = none: the chat's own model). */
+    static String planModel(String backend) {
+        if (!Prefs.dualModels(BestBuddyApp.context())) return "";
+        return Prefs.planModel(BestBuddyApp.context(), backend);
+    }
+
+    /** The model this agent carries a task out with ("" = the chat's own model). */
+    static String executeModel(String backend) {
+        if (!Prefs.dualModels(BestBuddyApp.context())) return "";
+        return Prefs.executeModel(BestBuddyApp.context(), backend);
+    }
+
+    /** The backup models to try when the chat's model fails, in the order the user set them. */
+    static java.util.List<String> fallbacks(String backend) {
+        java.util.List<String> out = new java.util.ArrayList<>();
+        try {
+            org.json.JSONArray a = new org.json.JSONArray(Prefs.fallbacks(BestBuddyApp.context(), backend));
+            for (int i = 0; i < a.length(); i++) {
+                String m = a.optString(i);
+                if (!m.isEmpty() && !out.contains(m)) out.add(m);
+            }
+        } catch (Exception ignored) {
+        }
+        return out;
+    }
+
+    /** Every model a chat of this agent can pick: the agent's own, then each API key service's. */
+    static java.util.List<String[]> pickable(String backend) {
+        java.util.List<String[]> out = new java.util.ArrayList<>();
+        for (String[] m : agentModels(backend)) out.add(m);
+        for (Providers.P p : Providers.enabled()) {
+            if (!p.fits(backend)) continue;
+            for (String[] m : providerModels(Providers.apiId(p.id))) {
+                out.add(new String[]{Providers.ref(p, m[0]), m[0] + " · " + p.name});
+            }
+        }
+        return out;
     }
 
     /** The chat's model as it will run: the one picked, or the agent's default. */
@@ -339,6 +396,7 @@ final class Models {
         Providers.P p = Providers.of(eff);
         if (p != null) return BestBuddyApp.str(R.string.models_via, serviceModelName(p, Providers.model(eff)), p.name);
         if (!s.model.isEmpty()) return label(s.backend, s.model);
+        if (!eff.isEmpty()) return label(s.backend, eff); // the default the user picked (one of the agent's own models)
         if (!s.actualModel.isEmpty()) return BestBuddyApp.str(R.string.models_name_default, nameOf(s.backend, s.actualModel));
         return BestBuddyApp.str(R.string.models_default_model);
     }
@@ -353,6 +411,7 @@ final class Models {
         String d = agentDefault(s.backend);
         Providers.P p = Providers.of(d);
         if (p != null) return BestBuddyApp.str(R.string.models_via, Providers.model(d), p.name);
+        if (!d.isEmpty()) return label(s.backend, d); // the default the user picked (one of the agent's own models)
         if (!s.actualModel.isEmpty()) return BestBuddyApp.str(R.string.models_default_now, nameOf(s.backend, s.actualModel));
         return defaultHint(s.backend);
     }
