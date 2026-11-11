@@ -85,7 +85,8 @@ final class Models {
         boolean plan = !("claude".equals(backend) || "codex".equals(backend)) || SetupState.planSignedIn(BestBuddyApp.context(), backend);
         for (String[] m : own) if (m[0].isEmpty() || plan) out.add(m);
         if (!services) return out;
-        for (Providers.P p : Providers.forAgent(backend)) {
+        for (Providers.P p : Providers.enabled()) {
+            if (!p.fits(backend)) continue;
             org.json.JSONArray models = p.offered();
             if (models.length() == 0) continue;
             out.add(new String[]{null, p.name});
@@ -95,6 +96,102 @@ final class Models {
             }
         }
         return out;
+    }
+
+    /** The models an agent offers (its own list, without the "Default" row). */
+    static java.util.List<String[]> agentModels(String agent) {
+        java.util.List<String[]> out = new java.util.ArrayList<>();
+        for (String[] m : forBackend(agent)) if (!m[0].isEmpty()) out.add(m);
+        return out;
+    }
+
+    /** The models a provider offers (a built-in agent's own, or an API key service's), as {id, name}. */
+    static java.util.List<String[]> providerModels(String providerId) {
+        java.util.List<String[]> out = new java.util.ArrayList<>();
+        String agent = Providers.agentOf(providerId);
+        if (!agent.isEmpty()) return agentModels(agent);
+        Providers.P p = Providers.find(Providers.serviceOf(providerId));
+        if (p == null) return out;
+        for (int i = 0; i < p.models.length(); i++) {
+            org.json.JSONObject m = p.models.optJSONObject(i);
+            if (m == null) continue;
+            String id = m.optString("id");
+            String name = m.optString("name");
+            out.add(new String[]{id, name.isEmpty() ? id : name});
+        }
+        return out;
+    }
+
+    /** The models of a provider the user picked (empty: all of them). */
+    static java.util.Set<String> shown(android.content.Context c, String providerId) {
+        java.util.Set<String> out = new java.util.LinkedHashSet<>();
+        String agent = Providers.agentOf(providerId);
+        if (!agent.isEmpty()) {
+            try {
+                org.json.JSONArray a = new org.json.JSONArray(Prefs.agentModels(c, agent));
+                for (int i = 0; i < a.length(); i++) out.add(a.optString(i));
+            } catch (Exception ignored) {
+            }
+            return out;
+        }
+        Providers.P p = Providers.find(Providers.serviceOf(providerId));
+        if (p != null) out.addAll(p.shown);
+        return out;
+    }
+
+    /** Saves the models of a provider the user picked (empty: all of them). */
+    static void setShown(android.content.Context c, String providerId, java.util.Set<String> ids) {
+        String agent = Providers.agentOf(providerId);
+        org.json.JSONArray a = new org.json.JSONArray();
+        for (String s : ids) a.put(s);
+        if (!agent.isEmpty()) {
+            Prefs.setAgentModels(c, agent, a.toString());
+            return;
+        }
+        Providers.P p = Providers.find(Providers.serviceOf(providerId));
+        if (p == null) return;
+        p.shown.clear();
+        p.shown.addAll(ids);
+        try {
+            Providers.save(c, p, null);
+        } catch (Exception ignored) {
+        }
+    }
+
+    /** The models of a provider the pickers show: the ones picked, or all of them. */
+    static java.util.List<String[]> offered(String providerId) {
+        java.util.Set<String> shown = shown(BestBuddyApp.context(), providerId);
+        java.util.List<String[]> all = providerModels(providerId);
+        if (shown.isEmpty()) return all;
+        java.util.List<String[]> out = new java.util.ArrayList<>();
+        for (String[] m : all) if (shown.contains(m[0])) out.add(m);
+        return out.isEmpty() ? all : out;
+    }
+
+    /**
+     * The model to try when the chat's one failed: the next in the same provider's list, then the next provider's first
+     * model, then the agent's own next model. "" when there is nothing to try (see ChatHub.autoSwitch).
+     */
+    static String nextFallback(String backend, String current) {
+        Providers.P p = Providers.of(current);
+        if (p != null) { // a service's model: the next one in that service, then another service
+            java.util.List<String> ids = new java.util.ArrayList<>();
+            for (String[] m : providerModels(Providers.apiId(p.id))) ids.add(m[0]);
+            int at = ids.indexOf(Providers.model(current));
+            for (int i = at + 1; i < ids.size(); i++) return Providers.ref(p, ids.get(i));
+            for (Providers.P q : Providers.enabled()) {
+                if (q.id.equals(p.id) || !q.fits(backend)) continue;
+                java.util.List<String[]> m = providerModels(Providers.apiId(q.id));
+                if (!m.isEmpty()) return Providers.ref(q, m.get(0)[0]);
+            }
+            return "";
+        }
+        // the agent's own model: the next one in its list ("" is its default, the first entry)
+        java.util.List<String> own = new java.util.ArrayList<>();
+        for (String[] m : forBackend(backend)) own.add(m[0]);
+        int at = own.indexOf(current);
+        for (int i = at + 1; i < own.size(); i++) if (!own.get(i).isEmpty()) return own.get(i);
+        return "";
     }
 
     /** What a chat on Default uses with this agent: "" (its plan's default) or "@service/model". */

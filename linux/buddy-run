@@ -22,6 +22,15 @@ unset BUN_OPTIONS
 D=$HOME/.buddy
 W=$D/work
 mkdir -p "$W" "$D/sessions"
+# A global proxy the user set in Settings → Providers (host:port): the agents' own requests go through it too.
+# The app's own address (the phone tools) is never proxied.
+if [ -s "$D/proxy" ]; then
+  PX=$(tr -d ' \t\r\n' < "$D/proxy")
+  if [ -n "$PX" ]; then
+    export HTTP_PROXY="http://$PX" HTTPS_PROXY="http://$PX" http_proxy="http://$PX" https_proxy="http://$PX"
+    export NO_PROXY="127.0.0.1,localhost" no_proxy="127.0.0.1,localhost"
+  fi
+fi
 TOKEN=${1:-}
 CMD=${2:-}
 URL=http://127.0.0.1:8765

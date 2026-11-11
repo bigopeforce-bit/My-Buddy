@@ -15,8 +15,10 @@ import java.util.List;
 final class SkillsCatalog {
     static final String[] ORDER = {
             "daily-brief", "inbox-triage", "reply-like-me", "summarize-chat", "meeting-notes",
-            "web-research", "price-watch", "travel-plan", "receipt-tracker", "translate-tone",
-            "writing-polish", "study-cards", "data-cleanup", "code-review", "app-walkthrough", "android-app",
+            "appointment-setup", "errand-run", "screenshot-triage", "package-tracking", "bill-check",
+            "meal-plan", "contact-tidy", "travel-kit", "web-research", "price-watch", "travel-plan",
+            "receipt-tracker", "translate-tone", "writing-polish", "study-cards", "data-cleanup",
+            "code-review", "app-walkthrough", "android-app",
     };
 
     static final class Item {

@@ -633,4 +633,46 @@ final class Prefs {
     static void setWaiting(Context c, String json) {
         sp(c).edit().putString("waiting", json).apply();
     }
+
+    /**
+     * The providers the user turned off (Settings → Providers), as JSON: ["h:opencode", "p:openrouter"].
+     * "h:" is a built-in agent, "p:" an API key service (see ProvidersActivity).
+     */
+    static String providersOff(Context c) {
+        return sp(c).getString("providers_off", "[]");
+    }
+
+    static void setProvidersOff(Context c, String json) {
+        sp(c).edit().putString("providers_off", json).apply();
+    }
+
+    /**
+     * The models an agent's picker shows, as JSON (an array of model ids; empty: all of them). The API key
+     * services keep their own list with the service (see Providers.P.shown).
+     */
+    static String agentModels(Context c, String agent) {
+        return sp(c).getString("agent_models_" + agent, "[]");
+    }
+
+    static void setAgentModels(Context c, String agent, String json) {
+        sp(c).edit().putString("agent_models_" + agent, json).apply();
+    }
+
+    /** The proxy every request to a provider goes through ("host:port"; empty: none). See ProvidersActivity. */
+    static String proxy(Context c) {
+        return sp(c).getString("proxy", "");
+    }
+
+    static void setProxy(Context c, String value) {
+        sp(c).edit().putString("proxy", value == null ? "" : value.trim()).apply();
+    }
+
+    /** When a model fails or is gone, the chat tries another one by itself (see ChatHub.autoSwitch). */
+    static boolean autoSwitch(Context c) {
+        return sp(c).getBoolean("auto_switch", true);
+    }
+
+    static void setAutoSwitch(Context c, boolean on) {
+        sp(c).edit().putBoolean("auto_switch", on).apply();
+    }
 }

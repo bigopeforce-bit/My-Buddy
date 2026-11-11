@@ -331,6 +331,54 @@ final class ChatHub {
         changed();
     }
 
+    /**
+     * The model failed or is gone: try another one, when the user wants that (Settings → Providers). The chat keeps
+     * the model it switched to, says which one it tried, and runs the same message again with it.
+     */
+    private void autoSwitch(Sessions.Session ses, String error) {
+        if (!Prefs.autoSwitch(app) || ses.switches >= 3 || ses.scheduledRun) return;
+        if (!modelFailed(error)) return;
+        String now = Models.effective(ses);
+        String next = Models.nextFallback(ses.backend, now);
+        if (next.isEmpty() || next.equals(now)) return;
+        ses.switches++;
+        ses.model = next;
+        sessions.save(ses);
+        add(ses, Bubble.Kind.STEP, app.getString(R.string.hub_model_switched, Models.label(ses.backend, now),
+                Models.label(ses.backend, next)));
+        String last = lastMessage(ses);
+        if (!last.isEmpty()) {
+            try {
+                Helper.run(app, "ask", ses.id, ses.backend, devArg(ses), last, model(ses), "", ses.effort);
+                startRun(ses);
+                ses.status = app.getString(R.string.hub_thinking);
+            } catch (Exception e) {
+                add(ses, Bubble.Kind.ERROR, e.getMessage());
+            }
+        }
+        changed();
+    }
+
+    /** Does this error say the model failed (and not that the task itself went wrong)? */
+    private static boolean modelFailed(String error) {
+        if (error == null || error.isEmpty()) return false;
+        String e = error.toLowerCase(java.util.Locale.ROOT);
+        if (!e.contains("model") && !e.contains("429") && !e.contains("quota") && !e.contains("rate limit")
+                && !e.contains("overloaded") && !e.contains("503") && !e.contains("capacity")) return false;
+        return e.matches("(?s).*(model.*(not found|no such|not available|unavailable|does not exist|unknown|invalid"
+                + "|not supported|not allowed|no access|expired|removed|disabled)"
+                + "|(429|quota|rate limit|overloaded|503|capacity|temporarily unavailable)).*");
+    }
+
+    /** The user's last message in the chat (the one to run again with another model). */
+    private String lastMessage(Sessions.Session ses) {
+        for (int i = ses.messages.size() - 1; i >= 0; i--) {
+            Sessions.Msg m = ses.messages.get(i);
+            if (m.kind == Bubble.Kind.USER) return m.text;
+        }
+        return "";
+    }
+
     /** Change a chat's effort ("" = the agent's default); the next message uses it. */
     void setEffort(Sessions.Session ses, String effort) {
         ses.effort = effort == null ? "" : effort;
@@ -542,6 +590,7 @@ final class ChatHub {
                 if (error && ses.outcome == null) ses.outcome = "failed";
                 if (error) {
                     String shown = r.isEmpty() ? app.getString(R.string.hub_agent_stopped, ses.brainName()) : r;
+                    ses.failure = shown; // what went wrong: the model may be the reason (see autoSwitch)
                     add(ses, Bubble.Kind.ERROR, shown);
                     CodexLive.agentSaid(ses, shown);
                 } else if (r.contains(QUIET)) {
@@ -579,6 +628,7 @@ final class ChatHub {
             case "buddy_error": {
                 if (ses.outcome == null) ses.outcome = "failed";
                 String text = ev.optString("text", app.getString(R.string.hub_something_wrong));
+                ses.failure = text; // the model may be the reason (see autoSwitch)
                 add(ses, Bubble.Kind.ERROR, text);
                 CodexLive.agentSaid(ses, text);
                 break;
@@ -605,6 +655,8 @@ final class ChatHub {
                     ses.running = false;
                     ses.status = "";
                     runEnded(ses);
+                    // the model may be the reason the run failed: try another one (Settings → Providers)
+                    if ("failed".equals(ses.outcome)) autoSwitch(ses, ses.failure);
                     if (!ses.lastReply.isEmpty()) {
                         Prefs.setHadReply(app);
                         flash(ses.lastReply);

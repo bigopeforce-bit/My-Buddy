@@ -108,6 +108,10 @@ final class Sessions {
         boolean scheduledRun;
         /** How the current run ended so far: null (fine), "stopped" or "failed". */
         String outcome;
+        /** What went wrong in this run (the agent's own words); the model may be the reason (see ChatHub.autoSwitch). */
+        String failure = "";
+        /** How many models this chat has switched to by itself after a failure (at most a few). */
+        int switches;
 
         Session(String id, String backend) {
             this.id = id;

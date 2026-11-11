@@ -100,6 +100,57 @@ final class Providers {
     private Providers() {
     }
 
+    /** A provider's id in the Providers screen: "h:opencode" (a built-in agent) or "p:openrouter" (an API service). */
+    static String builtinId(String agent) {
+        return "h:" + agent;
+    }
+
+    static String apiId(String id) {
+        return "p:" + id;
+    }
+
+    /** The agent's name in such an id, or "" when it isn't one. */
+    static String agentOf(String providerId) {
+        return providerId != null && providerId.startsWith("h:") ? providerId.substring(2) : "";
+    }
+
+    /** The API service's id in such an id, or "" when it isn't one. */
+    static String serviceOf(String providerId) {
+        return providerId != null && providerId.startsWith("p:") ? providerId.substring(2) : "";
+    }
+
+    /** Has the user turned this provider off (Settings → Providers)? */
+    static boolean off(Context c, String providerId) {
+        try {
+            JSONArray a = new JSONArray(Prefs.providersOff(c));
+            for (int i = 0; i < a.length(); i++) if (providerId.equals(a.optString(i))) return true;
+        } catch (Exception ignored) {
+        }
+        return false;
+    }
+
+    /** Turns a provider off or on, keeping the user's list of the ones that are off. */
+    static void setOff(Context c, String providerId, boolean off) {
+        java.util.LinkedHashSet<String> set = new java.util.LinkedHashSet<>();
+        try {
+            JSONArray a = new JSONArray(Prefs.providersOff(c));
+            for (int i = 0; i < a.length(); i++) set.add(a.optString(i));
+        } catch (Exception ignored) {
+        }
+        if (off) set.add(providerId);
+        else set.remove(providerId);
+        JSONArray out = new JSONArray();
+        for (String s : set) out.put(s);
+        Prefs.setProvidersOff(c, out.toString());
+    }
+
+    /** The API key services the user hasn't turned off. */
+    static List<P> enabled() {
+        List<P> out = new ArrayList<>();
+        for (P p : all()) if (!off(BestBuddyApp.context(), apiId(p.id))) out.add(p);
+        return out;
+    }
+
     static synchronized List<P> all() {
         if (cache != null) return cache;
         cache = new ArrayList<>();

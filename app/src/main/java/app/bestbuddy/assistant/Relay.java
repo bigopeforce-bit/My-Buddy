@@ -38,6 +38,27 @@ final class Relay {
         return anthropic && "api.anthropic.com".equals(Uri.parse(base).getHost());
     }
 
+    /** The proxy every request to a provider goes through (Settings → Providers), or null when there is none. */
+    private static java.net.Proxy proxy() {
+        String p = Prefs.proxy(BestBuddyApp.context());
+        if (p == null || p.trim().isEmpty()) return null;
+        try {
+            String[] hp = p.trim().split(":");
+            String host = hp[0].trim();
+            int port = hp.length > 1 ? Integer.parseInt(hp[1].trim()) : 8080;
+            if (host.isEmpty() || port <= 0 || port > 65535) return null;
+            return new java.net.Proxy(java.net.Proxy.Type.HTTP, new java.net.InetSocketAddress(host, port));
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    /** Opens the connection, through the global proxy when there is one. */
+    private static HttpURLConnection open(URL url) throws java.io.IOException {
+        java.net.Proxy px = proxy();
+        return (HttpURLConnection) (px == null ? url.openConnection() : url.openConnection(px));
+    }
+
     /**
      * The service's models, straight from the app (the key is here): [{id, name, window, efforts}], window the context
      * size in tokens (0 if not said), efforts the reasoning levels it lists. Services keep the list in different places
@@ -52,7 +73,7 @@ final class Relay {
                 b + "/v1/models", b + "/models", origin + "/v1/models", origin + "/models"));
         String error = null;
         for (String t : tries) {
-            HttpURLConnection con = (HttpURLConnection) new URL(t).openConnection();
+            HttpURLConnection con = open(new URL(t));
             con.setConnectTimeout(15_000);
             con.setReadTimeout(30_000);
             con.setInstanceFollowRedirects(false);
@@ -116,7 +137,7 @@ final class Relay {
         Probe p = new Probe();
         HttpURLConnection con = null;
         try {
-            con = (HttpURLConnection) new URL(url).openConnection();
+            con = open(new URL(url));
             con.setRequestMethod("POST");
             con.setConnectTimeout(15_000);
             con.setReadTimeout(30_000);
@@ -220,7 +241,7 @@ final class Relay {
             return;
         }
         String rest = parts.length == 3 ? "/" + parts[2] : "";
-        HttpURLConnection con = (HttpURLConnection) new URL(trim(base) + rest).openConnection();
+        HttpURLConnection con = open(new URL(trim(base) + rest));
         con.setRequestMethod(method);
         con.setConnectTimeout(30_000);
         con.setReadTimeout(10 * 60_000);

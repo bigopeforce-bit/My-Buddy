@@ -333,8 +333,13 @@ public class SetupActivity extends Screen implements Account.Listener, RemoteSes
         TextView brainInfo = text(this, getString(R.string.setup_default_brain_info), 13, MUTED);
         brainInfo.setPaddingRelative(0, dp(this, 2), 0, 0);
         ag.addView(brainInfo);
-        ag.addView(segmented(this, new String[][]{{"opencode", "OpenCode"}, {"gemini", "Gemini CLI"}, {"agy", "Antigravity"},
-                        {"grok", "Grok"}, {"codex", "Codex"}},
+        // the agents the user hasn't turned off in Settings → Providers
+        String[][] allBrains = new String[][]{{"opencode", "OpenCode"}, {"gemini", "Gemini CLI"}, {"agy", "Antigravity"},
+                {"grok", "Grok"}, {"codex", "Codex"}};
+        List<String[]> brains = new ArrayList<>();
+        for (String[] b : allBrains) if (!Providers.off(this, Providers.builtinId(b[0]))) brains.add(b);
+        if (brains.isEmpty()) brains.addAll(java.util.Arrays.asList(allBrains));
+        ag.addView(segmented(this, brains.toArray(new String[0][]),
                 backend, false, v -> {
                     Prefs.setBackend(this, v);
                     Toast.makeText(this, getString(R.string.setup_default_brain_set, Account.nameOf(v)),
@@ -345,6 +350,7 @@ public class SetupActivity extends Screen implements Account.Listener, RemoteSes
                     openAgent(v);
                 }), topGap(12));
         for (Account a : Account.OFFERED) ag.addView(agentRow(a.agent), topGap(a == Account.OPENCODE ? 12 : 4));
+        ag.addView(providersRow(), topGap(4));
         ag.addView(apiKeysRow(), topGap(4));
         ag.addView(skillsRow(), topGap(4));
         ag.addView(navRow(R.drawable.ms_terminal, "GitHub", GitHub.login == null || GitHub.login.isEmpty()
@@ -1262,9 +1268,24 @@ public class SetupActivity extends Screen implements Account.Listener, RemoteSes
         return r;
     }
 
+    /** Settings → Providers: the agents and the API key services, and which of their models the chats may use. */
+    private View providersRow() {
+        int on = 0, total = 0;
+        for (Account a : Account.OFFERED) {
+            if (Providers.off(this, Providers.builtinId(a.agent))) continue;
+            on++;
+            total++;
+        }
+        for (Providers.P p : Providers.all()) {
+            total++;
+            if (!Providers.off(this, Providers.apiId(p.id))) on++;
+        }
+        return navRow(R.drawable.ms_shield_person, getString(R.string.providers_title),
+                getString(R.string.providers_row_count, on, total), on > 0, ProvidersActivity.class);
+    }
+
     /** Settings → API keys: other services' models for Claude Code, Codex and OpenCode. */
-    private View apiKeysRow() {
-        List<String> names = new ArrayList<>();
+    private View apiKeysRow() {        List<String> names = new ArrayList<>();
         for (Providers.P p : Providers.all()) names.add(p.name);
         return navRow(R.drawable.ms_key, getString(R.string.api_keys_title), names.isEmpty()
                 ? getString(R.string.api_keys_row_none) : android.text.TextUtils.join(", ", names), !names.isEmpty(),

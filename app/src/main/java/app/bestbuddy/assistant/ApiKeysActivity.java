@@ -23,6 +23,18 @@ import static app.bestbuddy.assistant.Ui.*;
 public class ApiKeysActivity extends Screen {
     /** The agents that can use a service. */
     private static final String[] AGENTS = {"codex", "opencode"};
+    /** Which service to open right away ("new": a new one); see {@link #addProvider}. */
+    private static final String EXTRA_PROVIDER = "provider";
+
+    /** Opens this screen with the editor for a new service (from Settings → Providers). */
+    static void addProvider(android.app.Activity a) {
+        a.startActivity(new android.content.Intent(a, ApiKeysActivity.class).putExtra(EXTRA_PROVIDER, "new"));
+    }
+
+    /** Opens this screen with the editor for this service (from Settings → Providers). */
+    static void editProvider(android.app.Activity a, String id) {
+        a.startActivity(new android.content.Intent(a, ApiKeysActivity.class).putExtra(EXTRA_PROVIDER, id));
+    }
 
     private LinearLayout body;
 
@@ -58,6 +70,15 @@ public class ApiKeysActivity extends Screen {
     protected void onResume() {
         super.onResume();
         render();
+        // opened from Settings → Providers: the editor for the service it asked for
+        String want = getIntent().getStringExtra(EXTRA_PROVIDER);
+        if (want == null) return;
+        getIntent().removeExtra(EXTRA_PROVIDER);
+        if ("new".equals(want)) editor(null);
+        else {
+            Providers.P p = Providers.find(want);
+            if (p != null) editor(p);
+        }
     }
 
     private void render() {

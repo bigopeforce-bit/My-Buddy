@@ -214,6 +214,30 @@ final class Ui {
         return b;
     }
 
+    /** A small switch on its own (48×28), for a card's row. */
+    static View toggle(Context c, boolean on, Toggle l) {
+        final FrameLayout track = new FrameLayout(c);
+        final View knob = new View(c);
+        final boolean[] state = {on};
+        Runnable paint = () -> {
+            track.setBackground(rounded(c, state[0] ? ACCENT : CARD2, 14));
+            knob.setBackground(oval(state[0] ? ON_ACCENT : MUTED));
+            FrameLayout.LayoutParams kp = new FrameLayout.LayoutParams(dp(c, 20), dp(c, 20),
+                    Gravity.CENTER_VERTICAL | (state[0] ? Gravity.END : Gravity.START));
+            kp.leftMargin = kp.rightMargin = dp(c, 4);
+            knob.setLayoutParams(kp);
+        };
+        track.addView(knob);
+        paint.run();
+        track.setLayoutParams(new LinearLayout.LayoutParams(dp(c, 48), dp(c, 28)));
+        track.setOnClickListener(v -> {
+            state[0] = !state[0];
+            paint.run();
+            l.onToggle(state[0]);
+        });
+        return track;
+    }
+
     static LinearLayout.LayoutParams full() {
         return new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
     }
