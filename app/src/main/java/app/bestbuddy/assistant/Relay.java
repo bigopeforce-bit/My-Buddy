@@ -220,9 +220,17 @@ final class Relay {
                 window = m.optLong(k, 0);
                 if (window > 0) break;
             }
+            // a free model: the service says so in its pricing (Kilo's gateway: a price of -1)
+            boolean free = false;
+            org.json.JSONObject pricing = m.optJSONObject("pricing");
+            if (pricing != null) {
+                String p = pricing.optString("prompt", "");
+                free = "-1".equals(p.trim()) || "0".equals(p.trim());
+            }
             org.json.JSONObject effort = m.optJSONObject("effort");
             org.json.JSONArray levels = effort == null ? null : effort.optJSONArray("supported_levels");
             out.put(new org.json.JSONObject().put("id", id).put("name", name.isEmpty() ? id : name).put("window", window)
+                    .put("free", free)
                     .put("efforts", levels == null ? new org.json.JSONArray() : levels));
         }
         return out;
@@ -236,10 +244,12 @@ final class Relay {
         boolean anthropic = parts.length >= 2 && "a".equals(parts[1]);
         String base = p == null ? "" : anthropic ? p.anthropic : "o".equals(parts[1]) ? p.openai : "";
         String key = p == null ? null : Secrets.get(c, Providers.secretName(p.id));
-        if (key == null || base.isEmpty()) {
+        boolean keyless = p != null && Providers.keyless(base);
+        if ((key == null && !keyless) || base.isEmpty()) {
             error(out, 401, "No API key saved in BestBuddy for this service. Add one in BestBuddy's Settings, under API keys.");
             return;
         }
+        if (key == null) key = ""; // a service that needs no key (Kilo's free router)
         String rest = parts.length == 3 ? "/" + parts[2] : "";
         HttpURLConnection con = open(new URL(trim(base) + rest));
         con.setRequestMethod(method);

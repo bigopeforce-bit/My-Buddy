@@ -214,11 +214,27 @@ final class Models {
     /** What a chat on Default uses with this agent: "" (its plan's default), "@service/model" or one of its own models. */
     static String agentDefault(String backend) {
         String d = Prefs.agentDefault(BestBuddyApp.context(), backend);
-        if (!d.startsWith("@")) return d; // one of the agent's own models, the user's own pick (e.g. kilo-auto/free)
+        if (!d.startsWith("@")) {
+            // one of the agent's own models (e.g. kilo-auto/free), or the plain id of a service's model
+            String s = serviceModel(backend, d);
+            return s == null ? d : s;
+        }
         Providers.P p = Providers.of(d);
         if (p == null || !p.fits(backend)) return "";
         String m = Providers.model(d);
         return Providers.ref(p, m.isEmpty() ? p.defaultModel() : m);
+    }
+
+    /** The service's reference for a model id it lists (e.g. "kilo-auto/free" → "@kilo/kilo-auto/free"), or null. */
+    static String serviceModel(String backend, String id) {
+        if (id == null || id.isEmpty() || id.startsWith("@")) return null;
+        for (Providers.P p : Providers.enabled()) {
+            if (!p.fits(backend)) continue;
+            for (String[] m : providerModels(Providers.apiId(p.id))) {
+                if (m[0].equals(id)) return Providers.ref(p, id);
+            }
+        }
+        return null;
     }
 
     /** The model this agent plans with ("" = none: the chat's own model). */

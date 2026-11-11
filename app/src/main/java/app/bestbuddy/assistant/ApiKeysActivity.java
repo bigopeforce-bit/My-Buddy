@@ -242,6 +242,10 @@ public class ApiKeysActivity extends Screen {
         c.addView(openai, gap(8));
         c.addView(text(this, getString(R.string.api_keys_addresses_info), 13, MUTED), gap(6));
         c.addView(localInfo, gap(6));
+        TextView noKey = text(this, getString(R.string.api_keys_no_key_hint), 13, OK);
+        noKey.setVisibility(Providers.keyless(openai.getText().toString().trim())
+                || Providers.keyless(anthropic.getText().toString().trim()) ? View.VISIBLE : View.GONE);
+        c.addView(noKey, gap(6));
         TextView status = text(this, "", 13, MUTED);
         status.setVisibility(View.GONE);
         c.addView(status, gap(8));
@@ -258,8 +262,8 @@ public class ApiKeysActivity extends Screen {
             String k = key.getText().toString().trim();
             String an = anthropic.getText().toString().trim(), oa = openai.getText().toString().trim();
             String saved = !k.isEmpty() || adding ? k : Secrets.get(this, Providers.secretName(p.id));
-            final String useKey = (saved == null || saved.isEmpty()) && localOnly(an, oa) ? "" : saved;
-            if (useKey == null || useKey.isEmpty() && !localOnly(an, oa)) {
+            final String useKey = (saved == null || saved.isEmpty()) && noKeyNeeded(an, oa) ? "" : saved;
+            if (useKey == null || useKey.isEmpty() && !noKeyNeeded(an, oa)) {
                 key.requestFocus();
                 Toast.makeText(this, R.string.api_keys_need_key, Toast.LENGTH_SHORT).show();
                 return;
@@ -320,7 +324,7 @@ public class ApiKeysActivity extends Screen {
             String n = name.getText().toString().trim(), k = key.getText().toString().trim();
             String an = anthropic.getText().toString().trim(), oa = openai.getText().toString().trim();
             if (n.isEmpty()) n = !oa.isEmpty() || !an.isEmpty() ? hostName(!oa.isEmpty() ? oa : an) : "";
-            if (adding && k.isEmpty() && !localOnly(an, oa)) {
+            if (adding && k.isEmpty() && !noKeyNeeded(an, oa)) {
                 key.requestFocus();
                 Toast.makeText(this, R.string.api_keys_need_key, Toast.LENGTH_SHORT).show();
                 return;
@@ -335,7 +339,7 @@ public class ApiKeysActivity extends Screen {
             }
             // a local server without a key keeps an empty one, so the relay still finds the service
             String old = adding ? "" : Secrets.get(this, Providers.secretName(p.id));
-            final String fn = n, useKey = !k.isEmpty() ? k : old != null ? old : localOnly(an, oa) ? "" : null;
+            final String fn = n, useKey = !k.isEmpty() ? k : old != null ? old : noKeyNeeded(an, oa) ? "" : null;
             save.setEnabled(false);
             status.setVisibility(View.VISIBLE);
             status.setText(R.string.api_keys_saving);
@@ -346,7 +350,7 @@ public class ApiKeysActivity extends Screen {
                 try { // a new name isn't a reason to ask a service again; a server of your own is, since it costs
                     // nothing and you may have added models to it
                     boolean same = !adding && k.isEmpty() && an.equals(p.anthropic) && oa.equals(p.openai) && p.models.length() > 0
-                            && !localOnly(an, oa);
+                            && !noKeyNeeded(an, oa);
                     models = same ? p.models : Providers.list(useKey, an, oa);
                 } catch (Exception e) {
                     err = e.getMessage();
@@ -464,6 +468,11 @@ public class ApiKeysActivity extends Screen {
     /** Every address given is on this phone or the user's network: a key is optional (local servers don't use one). */
     private static boolean localOnly(String an, String oa) {
         return !(an + oa).isEmpty() && (an.isEmpty() || Providers.isLocal(an)) && (oa.isEmpty() || Providers.isLocal(oa));
+    }
+
+    /** This service needs no API key: a server on the phone, or one that lets its free models answer without one. */
+    private static boolean noKeyNeeded(String an, String oa) {
+        return localOnly(an, oa) || Providers.keyless(an) || Providers.keyless(oa);
     }
 
     /** "https://api.example.com/v1" → "Example". */

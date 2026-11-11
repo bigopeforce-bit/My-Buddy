@@ -14,6 +14,7 @@ import android.widget.ImageButton;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
@@ -28,6 +29,11 @@ import static app.bestbuddy.assistant.Ui.*;
  * an execute model for the two-model mode, and the backup models a chat tries when its model fails.
  */
 public class ModelsActivity extends Screen {
+    /** Kilo's gateway: the free router and the service id it gets in BestBuddy. */
+    private static final String KILO_ID = "kilo";
+    private static final String KILO_ADDRESS = "https://api.kilo.ai/api/gateway/v1";
+    private static final String KILO_MODEL = "kilo-auto/free";
+
     private LinearLayout body;
     private String agent;
 
@@ -104,6 +110,9 @@ public class ModelsActivity extends Screen {
         manage.setOnClickListener(v -> startActivity(new android.content.Intent(this, ProvidersActivity.class)));
         body.addView(manage, gap(8));
 
+        // Kilo's free router: one tap, no key and no account
+        body.addView(kiloCard(), gap(8));
+
         // Separate plan and execute models
         LinearLayout dual = column(this);
         dual.setPaddingRelative(dp(this, 16), dp(this, 14), dp(this, 16), dp(this, 14));
@@ -157,9 +166,59 @@ public class ModelsActivity extends Screen {
         body.addView(fb, gap(10));
     }
 
+    /**
+     * Kilo's free router ("kilo-auto/free"): it needs no key and no account. Adding it makes it a provider the
+     * pickers offer, and puts it as this agent's default model.
+     */
+    private LinearLayout kiloCard() {
+        LinearLayout c = column(this);
+        c.setPaddingRelative(dp(this, 16), dp(this, 14), dp(this, 16), dp(this, 14));
+        c.setBackground(outlined(this, CARD, 16, OUTLINE, 1));
+        c.addView(title(this, getString(R.string.models_kilo_title), 15));
+        c.addView(text(this, getString(R.string.models_kilo_info), 13, MUTED), gap(4));
+        Providers.P p = Providers.find(KILO_ID);
+        boolean on = p != null && !Providers.off(this, Providers.apiId(KILO_ID));
+        c.addView(text(this, getString(on ? R.string.models_kilo_on : R.string.models_kilo_off), 12,
+                on ? OK : MUTED), gap(8));
+        Button b = button(this, getString(on ? R.string.models_kilo_use : R.string.models_kilo_add), true);
+        LinearLayout.LayoutParams bp = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(this, 46));
+        c.addView(b, bp);
+        b.setOnClickListener(v -> {
+            if (p != null) {
+                Prefs.setAgentDefault(this, agent, Providers.ref(p, KILO_MODEL));
+                ChatHub.get(this).changed();
+                render();
+                return;
+            }
+            Toast.makeText(this, R.string.models_kilo_adding, Toast.LENGTH_SHORT).show();
+            new Thread(() -> {
+                String err = null;
+                try {
+                    Providers.P q = new Providers.P(KILO_ID);
+                    q.name = "Kilo";
+                    q.openai = KILO_ADDRESS;
+                    q.models = Providers.list("", "", KILO_ADDRESS);
+                    Providers.save(this, q, "");
+                    Prefs.setAgentDefault(this, agent, Providers.ref(q, KILO_MODEL));
+                } catch (Exception e) {
+                    err = String.valueOf(e.getMessage());
+                }
+                final String error = err;
+                runOnUiThread(() -> {
+                    if (error != null) {
+                        Toast.makeText(this, getString(R.string.models_kilo_failed, error), Toast.LENGTH_LONG).show();
+                        return;
+                    }
+                    ChatHub.get(this).changed();
+                    render();
+                });
+            }, "kilo").start();
+        });
+        return c;
+    }
+
     /** A row with a name on the left and the model on the right, with a chevron. */
-    private LinearLayout modelRow(String title, String model, Ui.Pick pick) {
-        LinearLayout r = row(this);
+    private LinearLayout modelRow(String title, String model, Ui.Pick pick) {        LinearLayout r = row(this);
         r.setPaddingRelative(0, dp(this, 8), 0, dp(this, 8));
         r.setBackgroundResource(ripple(this, false));
         r.addView(text(this, title, 15, TEXT), weight1());
@@ -203,6 +262,19 @@ public class ModelsActivity extends Screen {
         if (p != null) return Providers.model(model) + " · " + p.name;
         for (String[] m : Models.agentModels(agent)) if (m[0].equals(model)) return m[1];
         return model;
+    }
+
+    /**
+     * A model id the user typed: the one of an API key service it lists ("kilo-auto/free"), or the id as it is.
+     */
+    private String resolve(String id) {
+        for (Providers.P p : Providers.enabled()) {
+            if (!p.fits(agent)) continue;
+            for (String[] m : Models.providerModels(Providers.apiId(p.id))) {
+                if (m[0].equals(id)) return Providers.ref(p, id);
+            }
+        }
+        return id;
     }
 
     /** The model's context size, when it is known. */
@@ -294,7 +366,7 @@ public class ModelsActivity extends Screen {
             String id = et.getText().toString().trim();
             if (id.isEmpty()) return;
             d[0].dismiss();
-            pick.onPick(id);
+            pick.onPick(resolve(id));
         });
         d[0] = bottomSheet(this, protect(c));
         d[0].show();

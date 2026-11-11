@@ -73,6 +73,8 @@ final class Providers {
             {"OpenRouter", "https://openrouter.ai/api", "https://openrouter.ai/api/v1", "chat"},
             {"Anthropic", "https://api.anthropic.com", "", ""},
             {"OpenAI", "", "https://api.openai.com/v1", ""},
+            // Kilo Gateway: one address for many models, among them the free router "kilo-auto/free"
+            {"Kilo", "", "https://api.kilo.ai/api/gateway/v1", ""},
             // your own server: on this phone as given, or on a PC with its address on your network instead of localhost
             {"Ollama", "", "http://localhost:11434/v1", ""},
             {"LM Studio", "", "http://localhost:1234/v1", ""},
@@ -93,6 +95,15 @@ final class Providers {
         int a = Integer.parseInt(m.group(1)), b = Integer.parseInt(m.group(2));
         return a == 127 || a == 10 || (a == 192 && b == 168) || (a == 172 && b >= 16 && b <= 31)
                 || (a == 100 && b >= 64 && b <= 127);
+    }
+
+    /**
+     * An address that needs no API key: Kilo's gateway lets its free router ("kilo-auto/free") answer without one.
+     */
+    static boolean keyless(String base) {
+        if (base == null || base.isEmpty()) return false;
+        String h = android.net.Uri.parse(base).getHost();
+        return h != null && "api.kilo.ai".equalsIgnoreCase(h);
     }
 
     private static List<P> cache;
@@ -262,8 +273,8 @@ final class Providers {
     /** Asks the service for its models (OpenAI-style address first: it lists more) and keeps them. */
     static void fetch(Context c, P p) throws Exception {
         String key = Secrets.get(c, secretName(p.id));
-        if (key == null) return;
-        p.models = list(key, p.anthropic, p.openai);
+        if (key == null && !keyless(p.openai.isEmpty() ? p.anthropic : p.openai)) return;
+        p.models = list(key == null ? "" : key, p.anthropic, p.openai);
         store(c);
     }
 
