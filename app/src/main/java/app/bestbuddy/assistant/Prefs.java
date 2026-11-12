@@ -233,6 +233,15 @@ final class Prefs {
         sp(c).edit().putString("theme_mode", m).apply();
     }
 
+    /** Appearance typeface: Geist (default), system, rounded, serif or monospace. */
+    static String fontFamily(Context c) {
+        return sp(c).getString("font_family", "geist");
+    }
+
+    static void setFontFamily(Context c, String family) {
+        sp(c).edit().putString("font_family", family).apply();
+    }
+
     /** Accent colour (opaque ARGB). */
     static int accent(Context c) {
         return sp(c).getInt("accent", 0xFF3D6FE0);
