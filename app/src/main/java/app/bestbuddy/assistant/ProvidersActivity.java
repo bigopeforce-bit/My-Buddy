@@ -118,7 +118,7 @@ public class ProvidersActivity extends Screen {
         LinearLayout t = column(this);
         t.setPaddingRelative(dp(this, 6), 0, 0, 0);
         t.addView(title(this, getString(R.string.providers_title), 18));
-        t.addView(text(this, getString(R.string.providers_subtitle), 12, MUTED));
+        t.addView(text(this, getString(R.string.providers_subtitle) + " · Free models only · Automatic context-limit switching", 12, MUTED));
         top.addView(t, weight1());
         return top;
     }
@@ -217,6 +217,7 @@ public class ProvidersActivity extends Screen {
         for (Providers.P p : Providers.all()) {
             String id = Providers.apiId(p.id);
             List<String[]> models = Models.providerModels(id);
+            if (models.isEmpty()) continue; // don't offer services with no verified free model
             int shown = Models.shown(this, id).size();
             String sub = getString(R.string.providers_api) + " · " + p.host() + " · "
                     + getString(R.string.providers_models_count, shown == 0 ? models.size() : shown, models.size())
