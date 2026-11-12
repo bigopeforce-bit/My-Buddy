@@ -221,11 +221,14 @@ final class Relay {
                 if (window > 0) break;
             }
             // a free model: the service says so in its pricing (Kilo's gateway: a price of -1)
-            boolean free = false;
+            boolean free = id.toLowerCase(Locale.ROOT).endsWith(":free") || m.optBoolean("free", false)
+                    || m.optBoolean("is_free", false);
             org.json.JSONObject pricing = m.optJSONObject("pricing");
             if (pricing != null) {
-                String p = pricing.optString("prompt", "");
-                free = "-1".equals(p.trim()) || "0".equals(p.trim());
+                String prompt = pricing.optString("prompt", "").trim();
+                String completion = pricing.optString("completion", "").trim();
+                free = free || "-1".equals(prompt) || "0".equals(prompt)
+                        || "-1".equals(completion) || "0".equals(completion);
             }
             org.json.JSONObject effort = m.optJSONObject("effort");
             org.json.JSONArray levels = effort == null ? null : effort.optJSONArray("supported_levels");
