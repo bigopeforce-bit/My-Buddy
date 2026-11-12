@@ -162,6 +162,10 @@ final class Bubble implements ChatHub.Listener {
         lp = new WindowManager.LayoutParams(
                 WindowManager.LayoutParams.WRAP_CONTENT, WindowManager.LayoutParams.WRAP_CONTENT,
                 WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY, 0, PixelFormat.TRANSLUCENT);
+        if (Build.VERSION.SDK_INT >= 31 && Prefs.glassBlur(svc) > 0) {
+            lp.setBlurBehindRadius(dp(Math.min(32, Prefs.glassBlur(svc))));
+            lp.flags |= WindowManager.LayoutParams.FLAG_BLUR_BEHIND;
+        }
         root.addView(collapsed);
         applyCollapsedParams();
         createArcs();
@@ -225,10 +229,10 @@ final class Bubble implements ChatHub.Listener {
         faceBox.setClipChildren(false);
         ring = new RingView(svc);
         ring.setVisibility(View.GONE);
-        faceBox.addView(ring, new FrameLayout.LayoutParams(dp(74), dp(74), Gravity.CENTER));
-        faceBox.addView(face, new FrameLayout.LayoutParams(dp(60), dp(60), Gravity.CENTER));
+        faceBox.addView(ring, new FrameLayout.LayoutParams(dp(60), dp(60), Gravity.CENTER));
+        faceBox.addView(face, new FrameLayout.LayoutParams(dp(48), dp(48), Gravity.CENTER));
         holdRing = new HoldRing(svc);
-        faceBox.addView(holdRing, new FrameLayout.LayoutParams(dp(74), dp(74), Gravity.CENTER));
+        faceBox.addView(holdRing, new FrameLayout.LayoutParams(dp(60), dp(60), Gravity.CENTER));
         // 4. screen readers: "double-tap and hold for actions"
         face.setContentDescription(svc.getString(R.string.bubble_face_description));
         face.setLongClickable(true);
@@ -248,7 +252,7 @@ final class Bubble implements ChatHub.Listener {
         column.setOrientation(LinearLayout.VERTICAL);
         column.setGravity(Gravity.CENTER_HORIZONTAL);
         column.setClipChildren(false);
-        column.addView(faceBox, new LinearLayout.LayoutParams(dp(74), dp(74)));
+        column.addView(faceBox, new LinearLayout.LayoutParams(dp(60), dp(60)));
         // Stop, Add instruction, Stop voice… are in the hold menu (RadialMenu), not chips under the bubble
         bubbleFrame.addView(column);
 
@@ -261,19 +265,19 @@ final class Bubble implements ChatHub.Listener {
 
         pill = new TextView(svc);
         pill.setTextColor(Ui.TEXT);
-        pill.setTextSize(TypedValue.COMPLEX_UNIT_SP, 13);
+        pill.setTextSize(TypedValue.COMPLEX_UNIT_SP, 12);
         pill.setTypeface(Ui.sans(svc, 500));
-        pill.setMaxWidth(dp(250));
+        pill.setMaxWidth(dp(210));
         pill.setMaxLines(2); // status lines are often longer than one line
         pill.setLineSpacing(0, 1.05f);
         pill.setEllipsize(TextUtils.TruncateAt.END);
-        pill.setPaddingRelative(dp(12), dp(8), dp(12), dp(8));
-        pill.setBackground(rounded(Ui.BG, 18, Ui.ACCENT, 1));
+        pill.setPaddingRelative(dp(9), dp(6), dp(9), dp(6));
+        pill.setBackground(rounded(Theme.withAlpha(Ui.BG, 0xD8), 16, Theme.withAlpha(Ui.OUTLINE, 0xB0), 1));
         pill.setVisibility(View.GONE);
         LinearLayout.LayoutParams plp = new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
         plp.gravity = Gravity.TOP;
-        plp.topMargin = dp(22); // level with the face's centre, not the stop button below it
+        plp.topMargin = dp(18); // align with the smaller bubble face
         plp.setMarginStart(dp(6));
         plp.setMarginEnd(dp(6));
         collapsed.addView(pill, plp);
@@ -316,8 +320,11 @@ final class Bubble implements ChatHub.Listener {
             }
         };
         panel.setOrientation(LinearLayout.VERTICAL);
-        panel.setPaddingRelative(dp(12), dp(10), dp(12), dp(12));
-        panel.setBackground(rounded(Ui.BG, 24, Ui.OUTLINE, 1));
+        panel.setPaddingRelative(dp(10), dp(8), dp(10), dp(10));
+        // Translucent liquid-glass surface: retain readable contrast while allowing the
+        // underlying screen to show through the live mini-chat overlay.
+        panel.setBackground(rounded(Theme.withAlpha(Ui.BG, 0xD9), 22,
+                Theme.withAlpha(Ui.OUTLINE, 0xC0), 1));
         panel.setElevation(dp(10));
 
         // header like the chat screen: the chat's title (tap: all chats) and agent · model, then plain icons
