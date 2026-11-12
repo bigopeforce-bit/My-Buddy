@@ -17,7 +17,7 @@ final class Theme {
             {"#3D6FE0", "Ocean"}, {"#7C5CE0", "Violet"}, {"#12B886", "Mint"},
             {"#E8734A", "Coral"}, {"#E5678F", "Rose"}, {"#D9A03A", "Amber"},
     };
-    static final String[][] SURFACES = {{"warm", "Warm"}, {"neutral", "Neutral"}, {"black", "Black"}, {"amoled", "AMOLED"}, {"minimal", "Minimal"}, {"sunset", "Sunset"}, {"dynamic", "Dynamic"}};
+    static final String[][] SURFACES = {{"warm", "Warm"}, {"neutral", "Neutral"}, {"black", "Black"}, {"amoled", "AMOLED"}, {"minimal", "Minimal"}, {"sunset", "Sunset"}, {"glass", "Liquid Glass style"}, {"cyberpunk", "Cyberpunk"}, {"dynamic", "Dynamic"}};
     static final String[][] MODES = {{"system", "System"}, {"light", "Light"}, {"dark", "Dark"}};
 
     private static String applied = "";
@@ -89,6 +89,12 @@ final class Theme {
                 case "sunset":
                     set(0xFF1B100B, 0xFF29180F, 0xFF3A2114, 0xFF1B100B, 0xFF100904);
                     break;
+                case "glass":
+                    set(0xFF101722, 0xCC26364B, 0xB3223043, 0xD9121B2A, 0xFF070B12);
+                    break;
+                case "cyberpunk":
+                    set(0xFF080615, 0xFF15102B, 0xFF251644, 0xFF0B0719, 0xFF05030C);
+                    break;
                 case "dynamic":
                     set(systemColor(c, "system_neutral1_900", 0xFF101218),
                             systemColor(c, "system_neutral1_800", 0xFF1B2028),
@@ -100,9 +106,13 @@ final class Theme {
             }
             Ui.TEXT = "sunset".equals(surface) ? 0xFFFFF1E6
                     : "minimal".equals(surface) ? 0xFFF1F1F1
+                    : "glass".equals(surface) ? 0xFFEDF4FF
+                    : "cyberpunk".equals(surface) ? 0xFFF4ECFF
                     : "dynamic".equals(surface) ? systemColor(c, "system_neutral1_50", 0xFFE9EFF9) : 0xFFE9EFF9;
             Ui.MUTED = "sunset".equals(surface) ? 0xFFC9A894
                     : "minimal".equals(surface) ? 0xFFA6A6A6
+                    : "glass".equals(surface) ? 0xFFA8B9CE
+                    : "cyberpunk".equals(surface) ? 0xFFB9A6D9
                     : "dynamic".equals(surface) ? systemColor(c, "system_neutral2_200", 0xFF93A2B8) : 0xFF93A2B8;
             Ui.OK = 0xFF35C98A;
             Ui.ERR = 0xFFF0736F;
@@ -111,6 +121,8 @@ final class Theme {
             if ("warm".equals(surface)) set(0xFFF7F3EE, 0xFFFFFFFF, 0xFFECE5DD, 0xFFF1EBE4, 0xFF24121E);
             else if ("minimal".equals(surface)) set(0xFFFAFAFA, 0xFFFFFFFF, 0xFFEEEEEE, 0xFFF7F7F7, 0xFF101010);
             else if ("sunset".equals(surface)) set(0xFFFFF7F0, 0xFFFFFFFF, 0xFFF5E4D6, 0xFFFFF1E6, 0xFF24120B);
+            else if ("glass".equals(surface)) set(0xFFE8EFF8, 0xDFFFFFFF, 0xC9F0F5FF, 0xD9E2EAF5, 0xFF101827);
+            else if ("cyberpunk".equals(surface)) set(0xFFF5F0FF, 0xFFFFFFFF, 0xFFE9DFFF, 0xFFF0E8FF, 0xFF130B24);
             else if ("dynamic".equals(surface) && Build.VERSION.SDK_INT >= 31) {
                 set(systemColor(c, "system_neutral1_10", 0xFFF7F7FA),
                         systemColor(c, "system_neutral1_50", 0xFFFFFFFF),
@@ -118,9 +130,11 @@ final class Theme {
                         systemColor(c, "system_neutral1_10", 0xFFF7F7FA), 0xFF0A1222);
             } else set(0xFFF4F7FC, 0xFFFFFFFF, 0xFFE8EEF9, 0xFFFFFFFF, 0xFF0A1222);
             Ui.TEXT = "sunset".equals(surface) ? 0xFF2B170D : "minimal".equals(surface) ? 0xFF171717
+                    : "glass".equals(surface) ? 0xFF142033 : "cyberpunk".equals(surface) ? 0xFF20123B
                     : "dynamic".equals(surface) && Build.VERSION.SDK_INT >= 31
                     ? systemColor(c, "system_neutral1_900", 0xFF0E1A2B) : 0xFF0E1A2B;
             Ui.MUTED = "sunset".equals(surface) ? 0xFF8B6650 : "minimal".equals(surface) ? 0xFF666666
+                    : "glass".equals(surface) ? 0xFF60758F : "cyberpunk".equals(surface) ? 0xFF76638F
                     : "dynamic".equals(surface) && Build.VERSION.SDK_INT >= 31
                     ? systemColor(c, "system_neutral2_700", 0xFF5F6F86) : 0xFF5F6F86;
             Ui.OK = 0xFF12A66A;
