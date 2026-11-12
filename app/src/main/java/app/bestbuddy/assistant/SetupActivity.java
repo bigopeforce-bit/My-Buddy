@@ -282,6 +282,13 @@ public class SetupActivity extends Screen implements Account.Listener, RemoteSes
             Prefs.setThemeMode(this, v);
             themeChanged();
         }), topGap(8));
+        ap.addView(fieldLabel("Typeface", Prefs.fontFamily(this).toUpperCase(java.util.Locale.ROOT)), topGap(18));
+        ap.addView(segmented(this, new String[][]{{"geist", "Geist"}, {"system", "System"},
+                {"rounded", "Rounded"}, {"serif", "Serif"}, {"mono", "Mono"}, {"condensed", "Condensed"}},
+                Prefs.fontFamily(this), false, v -> {
+                    Prefs.setFontFamily(this, v);
+                    themeChanged();
+                }), topGap(8));
         ap.addView(fieldLabel(getString(R.string.setup_accent), Theme.hex(Prefs.accent(this))), topGap(18));
         ap.addView(swatches(), topGap(10));
         ap.addView(fieldLabel(getString(R.string.setup_surface), null), topGap(18));
