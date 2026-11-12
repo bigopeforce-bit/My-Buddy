@@ -77,6 +77,8 @@ final class Providers {
             {"Kilo", "", "https://api.kilo.ai/api/gateway/v1", ""},
             // your own server: on this phone as given, or on a PC with its address on your network instead of localhost
             {"Ollama", "", "http://localhost:11434/v1", ""},
+            // BestBuddy-managed FreeLLMAPI router (one unified key for its configured upstream providers)
+            {"FreeLLMAPI", "", "http://127.0.0.1:3001/v1", "chat"},
             {"LM Studio", "", "http://localhost:1234/v1", ""},
             {"llama.cpp", "", "http://localhost:8080/v1", ""},
     };
