@@ -35,21 +35,30 @@ final class FreeLLMAPI {
 
     static boolean running() {
         try {
-            HttpURLConnection connection = (HttpURLConnection) new URL("http://127.0.0.1:" + PORT + "/").openConnection();
+            HttpURLConnection connection = (HttpURLConnection) new URL("http://127.0.0.1:" + PORT + "/api/auth/status").openConnection();
             connection.setConnectTimeout(700);
             connection.setReadTimeout(700);
             connection.setRequestMethod("GET");
             int code = connection.getResponseCode();
-            connection.disconnect();
-            return code >= 200 && code < 400;
+            if (code != 200) return false;
+            StringBuilder body = new StringBuilder();
+            try (java.io.BufferedReader reader = new java.io.BufferedReader(
+                    new java.io.InputStreamReader(connection.getInputStream(), StandardCharsets.UTF_8))) {
+                String line;
+                while ((line = reader.readLine()) != null) body.append(line);
+            } finally {
+                connection.disconnect();
+            }
+            return body.indexOf("needsSetup") >= 0 && body.indexOf("authenticated") >= 0;
         } catch (Exception e) { return false; }
     }
 
     static boolean installing() { return installing; }
 
     static synchronized void ensureStarted(Context c) {
-        if (!installed(c) || running()) return;
-        start(c);
+        if (!installed(c) || process != null && process.isAlive() || running()) return;
+        try { start(c); }
+        catch (Exception e) { android.util.Log.e("FreeLLMAPI", "Could not restore local server", e); }
     }
 
     static void installAndStart(Context context, Listener listener) {
@@ -99,7 +108,7 @@ final class FreeLLMAPI {
     }
 
     private static synchronized void start(Context c) {
-        if (running()) return;
+        if (process != null && process.isAlive() || running()) return;
         try {
             String command = "cd " + DIR + " && set -a && . ./.env && set +a && exec node server/dist/index.js";
             Process p = Linux.builder(c, "/bin/sh", "-c", command).start();
