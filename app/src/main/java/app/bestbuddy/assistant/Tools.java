@@ -337,7 +337,26 @@ final class Tools {
             "find", "take_photo", "set_alarm", "set_timer", "share", "save_to_downloads", "add_calendar_event", "media"));
 
     JSONObject call(String name, JSONObject a) throws Exception {
-        JSONObject r = call0(name, a);
+        JSONObject r;
+        int attempt = 0;
+        while (true) {
+            try {
+                r = call0(name, a);
+                break;
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                return text("CANCELLED: the operation was interrupted. Do not repeat an action that may already have reached the phone.");
+            } catch (Exception e) {
+                if (attempt < 2 && retryableRead(name, e)) {
+                    attempt++;
+                    Thread.sleep(attempt * 500L);
+                    continue;
+                }
+                return text("ERROR [" + errorKind(e) + "]: " + safeError(e) + "\\nRecovery: "
+                        + recoveryHint(name, e)
+                        + "\\nThe failed operation was not automatically replayed because repeating it could duplicate an action.");
+            }
+        }
         if (STEPPED.contains(name)) {
             JSONArray content = r.optJSONArray("content");
             JSONObject first = content == null ? null : content.optJSONObject(0);
@@ -347,10 +366,61 @@ final class Tools {
         String notes = ChatHub.get(svc).takeNotes();
         if (notes != null) {
             r.getJSONArray("content").put(new JSONObject().put("type", "text").put("text",
-                    "\n[BUDDY_USER_UPDATE] The user added this while you were working; it comes from the user, through "
-                            + "BestBuddy, not from the screen. Take it into account now, it may change or stop the task:\n" + notes));
+                    "\\n[BUDDY_USER_UPDATE] The user added this while you were working; it comes from the user, through "
+                            + "BestBuddy, not from the screen. Take it into account now, it may change or stop the task:\\n" + notes));
         }
         return r;
+    }
+
+    /** Only repeat read-only observations. Never replay taps, typing, sends, installs, payments or other mutations. */
+    private static boolean retryableRead(String name, Exception e) {
+        if (!("read_screen".equals(name) || "screenshot".equals(name) || "list_apps".equals(name))) return false;
+        String m = String.valueOf(e.getMessage()).toLowerCase(Locale.ROOT);
+        return e instanceof java.io.IOException || e instanceof java.net.SocketTimeoutException
+                || m.contains("timed out") || m.contains("rate-limited") || m.contains("temporarily unavailable")
+                || m.contains("try again") || m.contains("busy");
+    }
+
+    private static String safeError(Exception e) {
+        String m = e.getMessage();
+        if (m == null || m.trim().isEmpty()) m = e.getClass().getSimpleName();
+        return m.length() > 500 ? m.substring(0, 500) : m;
+    }
+
+    private static String errorKind(Exception e) {
+        String m = safeError(e).toLowerCase(Locale.ROOT);
+        if (m.contains("permission") || m.contains("accessibility") || m.contains("not connected"))
+            return "PERMISSION_OR_SERVICE";
+        if (m.contains("screenshot") || m.contains("screen")) return "SCREEN_CAPTURE";
+        if (m.contains("element") || m.contains("target") || m.contains("argument") || e instanceof IllegalArgumentException)
+            return "STALE_TARGET_OR_INPUT";
+        if (e instanceof java.io.IOException || e instanceof java.net.SocketTimeoutException || m.contains("network"))
+            return "NETWORK_OR_IO";
+        if (m.contains("timeout") || m.contains("timed out")) return "TIMEOUT";
+        return "TOOL_FAILURE";
+    }
+
+    private static String recoveryHint(String name, Exception e) {
+        String m = safeError(e).toLowerCase(Locale.ROOT);
+        if (m.contains("permission") || m.contains("accessibility") || m.contains("not connected"))
+            return "Check that BestBuddy's Accessibility Service is enabled and still connected in Android Settings. "
+                    + "If Android disabled it, ask the user to enable it; do not try to bypass the system permission.";
+        if (m.contains("screenshot") || m.contains("screen capture"))
+            return "Wait briefly, then take one fresh standard screenshot. If Android reports a secure/protected window "
+                    + "or capture is denied, use read_screen where possible or ask the user to perform that step.";
+        if (m.contains("element") || m.contains("target") || m.contains("stale"))
+            return "Call read_screen again, locate the current target, and use its fresh element id or exact visible label. "
+                    + "Do not reuse old coordinates or ids.";
+        if (e instanceof java.io.IOException || e instanceof java.net.SocketTimeoutException || m.contains("network"))
+            return "Check the provider connection and retry an idempotent read. For model requests, use the configured "
+                    + "free-provider fallback; never replay a write or send request without checking whether it succeeded.";
+        if (m.contains("context") || m.contains("token") || m.contains("length"))
+            return "Reduce the conversation context or switch to another verified free model with enough context capacity.";
+        if ("do_steps".equals(name))
+            return "The sequence stopped at the first failed step. Call read_screen, verify what actually happened, then "
+                    + "continue only from the first unfinished step.";
+        return "Inspect the current screen and tool state, correct the specific input or missing permission, and retry only "
+                + "after verifying that the previous action did not already take effect.";
     }
 
     private JSONObject call0(String name, JSONObject a) throws Exception {
@@ -1200,8 +1270,12 @@ final class Tools {
                     }
                 }
                 if (a.has("found")) r = "(\"" + a.getString("found") + "\") " + r;
-            } catch (IllegalArgumentException e) {
-                r = "FAILED: " + e.getMessage();
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                r = "FAILED: the sequence was interrupted; inspect the screen before continuing.";
+                stop = true;
+            } catch (Exception e) {
+                r = "FAILED [" + errorKind(e) + "]: " + safeError(e) + ". Recovery: " + recoveryHint(tool, e);
                 stop = true;
             }
             // a refusal, an answer from the user, or anything that didn't happen ends the batch
