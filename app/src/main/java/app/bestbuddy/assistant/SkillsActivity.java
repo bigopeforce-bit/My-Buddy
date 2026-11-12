@@ -60,6 +60,9 @@ public class SkillsActivity extends Screen {
     private void render() {
         body.removeAllViews();
         body.addView(text(this, getString(R.string.skills_intro), 13, MUTED), full());
+        Button freeStores = button(this, "Browse free skill stores", true);
+        freeStores.setOnClickListener(v -> startActivity(new Intent(this, FreeSkillsActivity.class)));
+        body.addView(freeStores, gap(12));
         if (!Linux.installed(this)) {
             body.addView(text(this, getString(R.string.skills_need_linux), 15, TEXT), gap(18));
             return;
