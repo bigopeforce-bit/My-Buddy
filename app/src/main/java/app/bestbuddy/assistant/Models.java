@@ -257,7 +257,9 @@ final class Models {
                 String m = a.optString(i);
                 if (m.startsWith("@")) {
                     Providers.P provider = Providers.of(m);
-                    if (provider == null || !Providers.freeModel(provider, Providers.model(m))) continue;
+                    if (provider == null || !provider.fits(backend)
+                            || Providers.off(BestBuddyApp.context(), Providers.apiId(provider.id))
+                            || !Providers.freeModel(provider, Providers.model(m))) continue;
                 }
                 if (!m.isEmpty() && !out.contains(m)) out.add(m);
             }
