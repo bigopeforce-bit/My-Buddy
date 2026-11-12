@@ -492,6 +492,15 @@ final class Tools {
                             + "your own there without calling confirm. Apps on Hard or Smart still ask the user.");
                 }
                 String summary = a.getString("summary");
+                if (!ruleRun() && Prefs.autoRoutine(svc) && Guard.allowable(svc, svc.foregroundPkg())
+                        && Guard.routineText(summary)) {
+                    Guard.approved(summary, true);
+                    noteInChat(McpServer.CALLER_CHAT.get(), "Auto-Pilot approved this routine step in "
+                            + svc.foregroundAppName() + ". Sensitive actions remain protected.");
+                    return text("APPROVED automatically by Auto-Pilot for this routine step in "
+                            + svc.foregroundAppName() + ". This approval covers only the described action; "
+                            + "payment, purchases, deletion, installation, passwords and security settings still require user approval.");
+                }
                 if (!ruleRun() && Guard.routineText(summary) && Guard.runRule(svc, svc.foregroundPkg())) {
                     // the user allowed this app until the run ends: as after a countdown, it covers sending, nothing more
                     Guard.approved(summary, true);
@@ -1529,6 +1538,9 @@ final class Tools {
         String label = Guard.buttonLabel(target);
         String app = svc.foregroundAppName();
         boolean userAsks = Guard.listed(svc, "ask", label, pkg);
+        // Auto-Tap is limited to eligible apps and routine, non-password controls. Risky buttons still go through Guard.
+        if (Prefs.autoTap(svc) && !userAsks && Guard.allowable(svc, pkg)
+                && Guard.riskyLabel(target) == null && !target.isPassword()) return null;
         // auto-approve: as in an app the user trusts, but never for an app they listed as always asking
         if (!userAsks && Guard.autoApprove(svc, pkg)) return null;
         Guard.remember(svc, label, pkg, app);
