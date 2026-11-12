@@ -3,11 +3,11 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/ghorbelhamdi/buddy-android/releases/latest"><img src="https://img.shields.io/github/v/release/ghorbelhamdi/buddy-android?style=for-the-badge&label=release" alt="Latest release"></a>
-  <a href="https://github.com/ghorbelhamdi/buddy-android/releases"><img src="https://img.shields.io/github/downloads/ghorbelhamdi/buddy-android/total?style=for-the-badge" alt="Downloads"></a>
+  <a href="https://github.com/bigopeforce-bit/My-Buddy/releases/latest"><img src="https://img.shields.io/github/v/release/bigopeforce-bit/My-Buddy?style=for-the-badge&label=release" alt="Latest release"></a>
+  <a href="https://github.com/bigopeforce-bit/My-Buddy/releases"><img src="https://img.shields.io/github/downloads/bigopeforce-bit/My-Buddy/total?style=for-the-badge" alt="Downloads"></a>
   <img src="https://img.shields.io/badge/Android-11%2B-3DDC84?style=for-the-badge&logo=android&logoColor=white" alt="Android 11+">
   <a href="https://www.producthunt.com/products/buddy-20"><img src="https://img.shields.io/badge/Product_Hunt-BestBuddy-DA552F?style=for-the-badge&logo=producthunt&logoColor=white" alt="BestBuddy on Product Hunt"></a>
-  <a href="https://glama.ai/mcp/servers/ghorbelhamdi/buddy-android"><img src="https://glama.ai/mcp/servers/ghorbelhamdi/buddy-android/badges/score.svg" alt="BestBuddy MCP server on Glama" height="28"></a>
+  <a href="https://glama.ai/mcp/servers/bigopeforce-bit/My-Buddy"><img src="https://glama.ai/mcp/servers/bigopeforce-bit/My-Buddy/badges/score.svg" alt="BestBuddy MCP server on Glama" height="28"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache_2.0-blue?style=for-the-badge" alt="License: Apache-2.0"></a>
 </p>
 
@@ -19,7 +19,7 @@ Type or say what you want, like "reply to Sam that I'm running late" or "add a S
 
 It runs inside the app, on your own plan: [Claude Code](https://docs.claude.com/en/docs/claude-code) with your Claude plan, Codex with your ChatGPT plan, Google's [Antigravity CLI](https://antigravity.google) with your Google account, xAI's [Grok Build](https://x.ai/build) with your Google or X account, or [OpenCode](https://opencode.ai) with its free models and no account at all. No PC, no adb, no root, and no API key needed (you can add keys for other services, such as DeepSeek or OpenRouter, and use them with Claude Code, Codex or OpenCode).
 
-<p align="center"><a href="https://github.com/ghorbelhamdi/buddy-android/releases/latest/download/buddy.apk"><b>Download the APK</b></a> · <a href="https://ghorbelhamdi.github.io/buddy-android/">Website</a> · Android 11+, 64-bit</p>
+<p align="center"><a href="https://github.com/bigopeforce-bit/My-Buddy/releases/latest/download/buddy.apk"><b>Download the APK</b></a> · <a href="https://https://github.com/bigopeforce-bit/My-Buddy">Website</a> · Android 11+, 64-bit</p>
 
 <div align="center">
 
@@ -67,7 +67,7 @@ BestBuddy is a normal Android app with an accessibility service, the kind of per
 
 You need a 64-bit Android 11+ phone, plus a Claude, ChatGPT or Google account for those agents (Grok: a Google or X account). OpenCode's free models need no account.
 
-1. **Install BestBuddy:** [download buddy.apk](https://github.com/ghorbelhamdi/buddy-android/releases/latest/download/buddy.apk) and open it. It updates itself, and installs the apps it builds for you. (Google Play turned BestBuddy down for production: its policy doesn't allow apps that use accessibility to carry out tasks.)
+1. **Install BestBuddy:** [download buddy.apk](https://github.com/bigopeforce-bit/My-Buddy/releases/latest/download/buddy.apk) and open it. It updates itself, and installs the apps it builds for you. (Google Play turned BestBuddy down for production: its policy doesn't allow apps that use accessibility to carry out tasks.)
 2. **Follow the setup guide** that opens on first launch: pick your agent, turn on the accessibility service, install and sign in, and try a first task.
 
 **Install blocked or "Restricted setting"?** See [Setup in detail](docs/GUIDE.md#setup-in-detail).
@@ -119,7 +119,7 @@ Bug reports, ideas and translation fixes are welcome: see [CONTRIBUTING.md](CONT
 ## For developers
 
 ```
-git clone --recurse-submodules https://github.com/ghorbelhamdi/buddy-android.git
+git clone --recurse-submodules https://github.com/bigopeforce-bit/My-Buddy.git
 ./gradlew assembleRelease     # Android Studio / Gradle
 ./build.sh                    # on the phone in Termux, no Gradle → build/buddy-release.apk
 ```

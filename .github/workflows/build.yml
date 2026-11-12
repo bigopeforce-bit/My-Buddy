@@ -82,7 +82,7 @@ jobs:
 
       - uses: actions/upload-artifact@v7
         with:
-          name: buddy-apk
+          name: bestbuddy-apk
           path: dist/*.apk
 
       - name: Publish GitHub release
@@ -94,7 +94,7 @@ jobs:
           if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
             gh release upload "$GITHUB_REF_NAME" dist/*.apk --clobber
           else
-            gh release create "$GITHUB_REF_NAME" dist/*.apk --title "Buddy $GITHUB_REF_NAME" --generate-notes
+            gh release create "$GITHUB_REF_NAME" dist/*.apk --title "BestBuddy $GITHUB_REF_NAME" --generate-notes
           fi
           # which of the APKs to download, at the end of the notes (once)
           notes=$(gh release view "$GITHUB_REF_NAME" --json body -q .body)
