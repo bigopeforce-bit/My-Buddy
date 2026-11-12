@@ -353,6 +353,7 @@ public class SetupActivity extends Screen implements Account.Listener, RemoteSes
         ag.addView(modelsRow(), topGap(4));
         ag.addView(providersRow(), topGap(4));
         ag.addView(apiKeysRow(), topGap(4));
+        ag.addView(navRow(R.drawable.ms_hub, "FreeLLMAPI", FreeLLMAPI.running() ? "Local router running · :3001" : "Free-model API gateway in built-in Linux", FreeLLMAPI.running(), FreeLLMAPIActivity.class), topGap(4));
         ag.addView(skillsRow(), topGap(4));
         ag.addView(navRow(R.drawable.ms_terminal, "GitHub", GitHub.login == null || GitHub.login.isEmpty()
                 ? getString(R.string.github_row_none) : "@" + GitHub.login, GitHub.login != null && !GitHub.login.isEmpty(),
