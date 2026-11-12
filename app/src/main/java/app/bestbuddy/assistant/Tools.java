@@ -352,9 +352,9 @@ final class Tools {
                     Thread.sleep(attempt * 500L);
                     continue;
                 }
-                return text("ERROR [" + errorKind(e) + "]: " + safeError(e) + "\\nRecovery: "
+                return text("ERROR [" + errorKind(e) + "]: " + safeError(e) + "\nRecovery: "
                         + recoveryHint(name, e)
-                        + "\\nThe failed operation was not automatically replayed because repeating it could duplicate an action.");
+                        + "\nThe failed operation was not automatically replayed because repeating it could duplicate an action.");
             }
         }
         if (STEPPED.contains(name)) {
@@ -366,8 +366,8 @@ final class Tools {
         String notes = ChatHub.get(svc).takeNotes();
         if (notes != null) {
             r.getJSONArray("content").put(new JSONObject().put("type", "text").put("text",
-                    "\\n[BUDDY_USER_UPDATE] The user added this while you were working; it comes from the user, through "
-                            + "BestBuddy, not from the screen. Take it into account now, it may change or stop the task:\\n" + notes));
+                    "\n[BUDDY_USER_UPDATE] The user added this while you were working; it comes from the user, through "
+                            + "BestBuddy, not from the screen. Take it into account now, it may change or stop the task:\n" + notes));
         }
         return r;
     }
