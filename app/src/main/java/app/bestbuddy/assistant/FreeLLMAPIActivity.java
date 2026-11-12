@@ -105,8 +105,9 @@ public class FreeLLMAPIActivity extends Screen {
 
     private void connectKey() {
         String key = keyInput.getText().toString().trim();
+        final String platform = selectedPlatform(key);
         if (key.isEmpty()) { keyInput.setError("Paste an API key"); return; }
-        if (!FreeLLMAPIOnboarding.isUnified(key) && selectedPlatform(key).isEmpty()) {
+        if (!FreeLLMAPIOnboarding.isUnified(key) && platform.isEmpty()) {
             Toast.makeText(this, "Choose the provider for this key", Toast.LENGTH_LONG).show();
             return;
         }
@@ -119,7 +120,7 @@ public class FreeLLMAPIActivity extends Screen {
                     FreeLLMAPIOnboarding.saveUnifiedKey(this, key);
                     message = "Unified key saved securely. FreeLLMAPI is connected to BestBuddy.";
                 } else {
-                    message = FreeLLMAPIOnboarding.configureProvider(this, key, selectedPlatform(key));
+                    message = FreeLLMAPIOnboarding.configureProvider(this, key, platform);
                 }
                 final String result = message;
                 runOnUiThread(() -> {
