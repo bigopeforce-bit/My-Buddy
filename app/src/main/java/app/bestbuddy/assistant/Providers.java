@@ -36,15 +36,17 @@ final class Providers {
             return "opencode".equals(agent) && (!anthropic.isEmpty() || !openai.isEmpty());
         }
 
-        /** The models the pickers offer: the ones picked to show, or all. */
+        /** Only verified free models are exposed to chats and agents. */
         JSONArray offered() {
-            if (shown.isEmpty()) return models;
             JSONArray out = new JSONArray();
             for (int i = 0; i < models.length(); i++) {
                 JSONObject m = models.optJSONObject(i);
-                if (m != null && shown.contains(m.optString("id"))) out.put(m);
+                if (m == null) continue;
+                String id = m.optString("id");
+                if ((!shown.isEmpty() && !shown.contains(id)) || !freeModel(this, m)) continue;
+                out.put(m);
             }
-            return out.length() == 0 ? models : out;
+            return out;
         }
 
         String defaultModel() {
