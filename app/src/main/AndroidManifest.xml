@@ -2,6 +2,7 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
     <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="com.termux.permission.RUN_COMMAND" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
@@ -30,6 +31,7 @@
 
     <!-- Needed on Android 11+ to see launchable apps for open_app / list_apps -->
     <queries>
+        <package android:name="com.termux" />
         <!-- the home app, to fold the bubble panel when Recents or Home opens -->
         <intent>
             <action android:name="android.intent.action.MAIN" />
