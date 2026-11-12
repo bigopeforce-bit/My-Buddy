@@ -17,7 +17,7 @@ final class FreeLLMAPIOnboarding {
         if (k.startsWith("gsk_")) return "groq";
         if (k.startsWith("sk-or-v1-")) return "openrouter";
         if (k.startsWith("csk-")) return "cerebras";
-        if (k.startsWith("sk-") && k.length() > 30) return "mistral";
+        
         return "";
     }
 
