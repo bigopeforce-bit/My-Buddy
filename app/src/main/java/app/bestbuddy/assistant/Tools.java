@@ -37,6 +37,7 @@ final class Tools {
     private static final int MAX_NODES = 350;
     /** Screenshots are scaled so their shorter side is at most this, the same in portrait and landscape. */
     private static final int SCREENSHOT_SHORT_SIDE = 720;
+    private static final int SCREENSHOT_HIGH_SHORT_SIDE = 1080;
 
     private final BestBuddyService svc;
     private final Object lock = new Object();
@@ -64,13 +65,15 @@ final class Tools {
                 "Tap an element (by id from the last read_screen) or a screen coordinate in pixels. The result says NOTHING CHANGED "
                         + "when the screen reads the same afterwards, and an element under another window isn't tapped.",
                 props().put("element", intProp("Element id from read_screen"))
+                        .put("text", strProp("Visible text or content description to tap when no fresh element id is available"))
                         .put("x", intProp("X in screen pixels")).put("y", intProp("Y in screen pixels"))));
         t.put(tool("long_press",
                 "Press and hold an element (by id from the last read_screen) or a screen coordinate in pixels, for "
                         + "about 0.7 s. Use it for what apps put behind a long press: a message's or item's menu (reply, "
                         + "copy, delete, react), selecting items or text, moving icons. Use tap for normal taps. Returns "
                         + "\"Long-pressed\" and where; call read_screen to see the menu or selection it opened.",
-                props().put("element", intProp("Element id from read_screen (give this, or x and y)"))
+                props().put("element", intProp("Element id from read_screen (give this, text, or x and y)"))
+                        .put("text", strProp("Visible text or content description of the item to long-press"))
                         .put("x", intProp("X in screen pixels, when there's no element id"))
                         .put("y", intProp("Y in screen pixels, when there's no element id"))));
         t.put(tool("type_text",
@@ -78,6 +81,7 @@ final class Tools {
                         + "Set submit to press the keyboard's enter/send action afterwards.",
                 props().put("text", strProp("Text to type"))
                         .put("element", intProp("Optional element id of the text field"))
+                        .put("target", strProp("Optional visible text or hint of the target field; use when it is not already focused"))
                         .put("append", boolProp("Append instead of replacing"))
                         .put("submit", boolProp("Press the IME enter/send action after typing")),
                 "text"));
@@ -122,7 +126,7 @@ final class Tools {
         t.put(tool("screenshot",
                 "Take a screenshot (JPEG). Use only when read_screen is not enough (images, games, canvas UIs). "
                         + "The reply says how to convert image coordinates to screen pixels.",
-                props()));
+                props().put("detail", enumProp("standard", "high"))));
         t.put(tool("wait", "Wait for the UI to settle, up to 10000 ms. To wait for something to happen, wait_for is "
                         + "quicker and surer.",
                 props().put("ms", intProp("Milliseconds")), "ms"));
@@ -398,7 +402,7 @@ final class Tools {
                 }
                 return text(openUrl(a.getString("url")));
             }
-            case "screenshot": return screenshot();
+            case "screenshot": return screenshot(a);
             case "wait_for": return text(waitFor(a));
             case "do_steps": return text(doSteps(a.getJSONArray("steps")));
             case "collect": return text(collect(a));
@@ -982,7 +986,14 @@ final class Tools {
     }
 
     private AccessibilityNodeInfo node(JSONObject a) {
-        if (!a.has("element")) return null;
+        if (!a.has("element")) {
+            String label = a.optString("text", a.optString("target", "")).trim();
+            if (label.isEmpty()) return null;
+            AccessibilityNodeInfo found = findText(label);
+            if (found == null) throw new IllegalArgumentException("No visible element matches \"" + label
+                    + "\". Call read_screen and use a fresh element id, or check the label.");
+            return found;
+        }
         int id = a.optInt("element", -1);
         synchronized (lock) {
             if (id < 0 || id >= lastNodes.size())
@@ -1934,17 +1945,17 @@ final class Tools {
         return "Opened " + url + ". Call read_screen to see it.";
     }
 
-    private JSONObject screenshot() throws Exception {
+    private JSONObject screenshot(JSONObject args) throws Exception {
         try {
-            return screenshotOnce();
+            return screenshotOnce(args);
         } catch (IllegalStateException e) { // too soon after "View steps" took its own: once more, a second later
             if (!String.valueOf(e.getMessage()).startsWith("Screenshots are rate-limited")) throw e;
             Thread.sleep(1100);
-            return screenshotOnce();
+            return screenshotOnce(args);
         }
     }
 
-    private JSONObject screenshotOnce() throws Exception {
+    private JSONObject screenshotOnce(JSONObject args) throws Exception {
         svc.setBubblePassThrough(true);
         Thread.sleep(150);
         final CountDownLatch done = new CountDownLatch(1);
@@ -1977,15 +1988,17 @@ final class Tools {
         }
         Bitmap full = shot.get();
         if (full == null) throw new IllegalStateException(error.get() != null ? error.get() : "Screenshot timed out.");
-        float scale = Math.min(1f, (float) SCREENSHOT_SHORT_SIDE / Math.min(full.getWidth(), full.getHeight()));
+        boolean high = "high".equalsIgnoreCase(args.optString("detail", "standard"));
+        int targetSide = high ? SCREENSHOT_HIGH_SHORT_SIDE : SCREENSHOT_SHORT_SIDE;
+        float scale = Math.min(1f, (float) targetSide / Math.min(full.getWidth(), full.getHeight()));
         Bitmap small = scale < 1f
                 ? Bitmap.createScaledBitmap(full, Math.round(full.getWidth() * scale), Math.round(full.getHeight() * scale), true)
                 : full;
         ByteArrayOutputStream jpg = new ByteArrayOutputStream();
-        small.compress(Bitmap.CompressFormat.JPEG, 70, jpg);
+        small.compress(Bitmap.CompressFormat.JPEG, high ? 82 : 70, jpg);
         String note = String.format(Locale.ROOT,
-                "Screenshot %dx%d (screen is %dx%d). To tap something you see, multiply image coordinates by %.3f.",
-                small.getWidth(), small.getHeight(), full.getWidth(), full.getHeight(), 1f / scale);
+                "Screenshot %dx%d (screen is %dx%d, detail=%s). To tap something you see, multiply image coordinates by %.3f.",
+                small.getWidth(), small.getHeight(), full.getWidth(), full.getHeight(), high ? "high" : "standard", 1f / scale);
         return new JSONObject().put("content", new JSONArray()
                 .put(new JSONObject().put("type", "image").put("mimeType", "image/jpeg")
                         .put("data", Base64.encodeToString(jpg.toByteArray(), Base64.NO_WRAP)))
