@@ -443,6 +443,13 @@ final class ChatHub {
         changed();
     }
 
+    /** Let this chat keep working while the user interacts with other apps; phone actions refresh stale screen state. */
+    void setBackground(Sessions.Session ses, boolean on) {
+        ses.background = on;
+        sessions.save(ses);
+        changed();
+    }
+
     /**
      * Add or take away an app from a chat's "Allowed without asking" (until its run ends, see Guard.runRule; with a
      * schedule, kept for its scheduled runs).
@@ -880,7 +887,7 @@ final class ChatHub {
         CodexLive.agentDone(ses, ses.outcome, !ses.lastReply.isEmpty());
         // a quiet scheduled run that found nothing new ends without a notification (a failed one always says so)
         boolean quiet = ses.quietRun && ses.quietSaid && ses.outcome == null;
-        if ((ses.awake || ses.scheduledRun) && !quiet) KeepAwake.notifyEnded(app, ses);
+        if ((ses.awake || ses.background || ses.scheduledRun) && !quiet) KeepAwake.notifyEnded(app, ses);
         ses.scheduledRun = false;
         ses.quietRun = false;
         ses.quietSaid = false;
