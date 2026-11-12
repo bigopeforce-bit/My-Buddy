@@ -41,9 +41,8 @@ jobs:
         env:
           NDK_VERSION: 27.2.12479018
 
-      # Use a persistent repository signing key when configured. If no key is configured,
-      # generate a temporary CI key for this installable test build. Configure the two repository
-      # secrets before publishing future updates so Android sees the same signing identity.
+      # Use the persistent repository signing key for releases. Pull-request and branch builds may use
+      # a temporary key for testing, but version tags must fail closed without the persistent key.
       - name: Prepare release signing key
         env:
           KEYSTORE_BASE64: ${{ secrets.BUDDY_KEYSTORE_BASE64 }}
@@ -51,13 +50,20 @@ jobs:
         run: |
           if [[ -n "$KEYSTORE_BASE64" && -n "$KEYSTORE_PASSWORD_SECRET" ]]; then
             echo "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/release.jks"
+            test -s "$RUNNER_TEMP/release.jks"
             echo "BUDDY_KEYSTORE_PASSWORD=$KEYSTORE_PASSWORD_SECRET" >> "$GITHUB_ENV"
           else
+            # Never publish a version tag signed with a throwaway key: Android will reject it as an update
+            # to any existing install signed by the persistent release key.
+            if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+              echo "::error::Configure BUDDY_KEYSTORE_BASE64 and BUDDY_KEYSTORE_PASSWORD before publishing a release tag."
+              exit 1
+            fi
             KEYSTORE_PASSWORD="$(openssl rand -hex 24)"
             keytool -genkeypair -noprompt -keystore "$RUNNER_TEMP/release.jks" \
               -storepass "$KEYSTORE_PASSWORD" -keypass "$KEYSTORE_PASSWORD" \
               -alias buddy -keyalg RSA -keysize 3072 -validity 10000 \
-              -dname "CN=BestBuddy Temporary Release, OU=Android, O=BestBuddy, L=Lagos, ST=Lagos, C=NG"
+              -dname "CN=BestBuddy CI Test, OU=Android, O=BestBuddy, L=Lagos, ST=Lagos, C=NG"
             echo "BUDDY_KEYSTORE_PASSWORD=$KEYSTORE_PASSWORD" >> "$GITHUB_ENV"
           fi
           echo "BUDDY_KEYSTORE=$RUNNER_TEMP/release.jks" >> "$GITHUB_ENV"

@@ -268,7 +268,21 @@ final class Relay {
             return;
         }
 
-        if ((key == null && !keyless) || base.isEmpty()) {
+        if (base.isEmpty()) {
+            error(out, 400, "This provider does not expose the requested API.");
+            return;
+        }
+        try {
+            URL endpoint = new URL(base);
+            if (!"https".equalsIgnoreCase(endpoint.getProtocol()) && !Providers.isLocal(base)) {
+                error(out, 403, "Unencrypted HTTP is permitted only for a local or private-network model server.");
+                return;
+            }
+        } catch (Exception invalidAddress) {
+            error(out, 400, "The provider address is invalid.");
+            return;
+        }
+        if (key == null && !keyless) {
             error(out, 401, "No API key saved in BestBuddy for this service. Add one in BestBuddy's Settings, under API keys.");
             return;
         }

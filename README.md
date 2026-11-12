@@ -129,3 +129,7 @@ proot and libandroid-shmem are git submodules in `third_party/` (`git submodule 
 ## License
 
 [Apache-2.0](LICENSE). Geist fonts: SIL Open Font License. Icons: Material Symbols (Apache-2.0). Bundled proot (GPL-2.0), talloc (LGPL-3.0) and libandroid-shmem (BSD-3-Clause): see [third_party](third_party/README.md) for licences and source.
+
+## Android APK build
+
+GitHub Actions builds the GitHub and F-Droid release APK variants on pushes to `main`, pull requests, and version tags. Pull request builds upload the APKs as the `bestbuddy-apk` workflow artifact. Version-tag releases require the persistent repository signing key (`BUDDY_KEYSTORE_BASE64` and `BUDDY_KEYSTORE_PASSWORD`); CI refuses to publish a version signed with a temporary key.
