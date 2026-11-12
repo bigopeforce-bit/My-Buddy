@@ -989,8 +989,13 @@ final class Tools {
     }
 
     private AccessibilityNodeInfo node(JSONObject a) {
+        return node(a, false);
+    }
+
+    /** Resolve visible text only for touch actions; type_text.text is the content to enter, not a target label. */
+    private AccessibilityNodeInfo node(JSONObject a, boolean allowTextTarget) {
         if (!a.has("element")) {
-            String label = a.optString("text", a.optString("target", "")).trim();
+            String label = a.optString("target", allowTextTarget ? a.optString("text", "") : "").trim();
             if (label.isEmpty()) return null;
             AccessibilityNodeInfo found = findText(label);
             if (found == null) throw new IllegalArgumentException("No visible element matches \"" + label
@@ -1314,7 +1319,7 @@ final class Tools {
     // ------------------------------------------------------------- actions
 
     private String tap(JSONObject a, boolean longPress) throws Exception {
-        AccessibilityNodeInfo n = node(a);
+        AccessibilityNodeInfo n = node(a, true);
         int x, y;
         if (n != null) {
             Rect r = new Rect();
