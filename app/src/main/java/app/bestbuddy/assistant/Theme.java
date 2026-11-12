@@ -4,9 +4,15 @@ import android.app.Activity;
 import android.content.Context;
 import android.content.res.Configuration;
 import android.graphics.Color;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
+import android.graphics.drawable.BitmapDrawable;
+import android.graphics.drawable.ColorDrawable;
+import android.net.Uri;
 import android.os.Build;
 import android.view.View;
 import android.view.Window;
+import android.view.WindowManager;
 
 /**
  * Computes BestBuddy's palette from the user's appearance settings (mode, accent, surface style) and
@@ -90,7 +96,7 @@ final class Theme {
                     set(0xFF1B100B, 0xFF29180F, 0xFF3A2114, 0xFF1B100B, 0xFF100904);
                     break;
                 case "glass":
-                    set(0xFF101722, 0xCC26364B, 0xB3223043, 0xD9121B2A, 0xFF070B12);
+                    set(0xCC101722, 0xCC26364B, 0xB3223043, 0xD9121B2A, 0xFF070B12);
                     break;
                 case "cyberpunk":
                     set(0xFF080615, 0xFF15102B, 0xFF251644, 0xFF0B0719, 0xFF05030C);
@@ -121,7 +127,7 @@ final class Theme {
             if ("warm".equals(surface)) set(0xFFF7F3EE, 0xFFFFFFFF, 0xFFECE5DD, 0xFFF1EBE4, 0xFF24121E);
             else if ("minimal".equals(surface)) set(0xFFFAFAFA, 0xFFFFFFFF, 0xFFEEEEEE, 0xFFF7F7F7, 0xFF101010);
             else if ("sunset".equals(surface)) set(0xFFFFF7F0, 0xFFFFFFFF, 0xFFF5E4D6, 0xFFFFF1E6, 0xFF24120B);
-            else if ("glass".equals(surface)) set(0xFFE8EFF8, 0xDFFFFFFF, 0xC9F0F5FF, 0xD9E2EAF5, 0xFF101827);
+            else if ("glass".equals(surface)) set(0xDDE8EFF8, 0xDFFFFFFF, 0xC9F0F5FF, 0xD9E2EAF5, 0xFF101827);
             else if ("cyberpunk".equals(surface)) set(0xFFF5F0FF, 0xFFFFFFFF, 0xFFE9DFFF, 0xFFF0E8FF, 0xFF130B24);
             else if ("dynamic".equals(surface) && Build.VERSION.SDK_INT >= 31) {
                 set(systemColor(c, "system_neutral1_10", 0xFFF7F7FA),
@@ -182,6 +188,53 @@ final class Theme {
             flags |= View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR | View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR;
         }
         w.getDecorView().setSystemUiVisibility(flags);
+
+        // Real Android 12+ backdrop blur. The translucent glass palette lets the OS blur
+        // the content behind the activity window; older Android versions keep the glass tint.
+        boolean glass = "glass".equals(Prefs.surface(a));
+        if (Build.VERSION.SDK_INT >= 31) {
+            if (glass && Prefs.glassBlur(a) > 0) {
+                w.addFlags(WindowManager.LayoutParams.FLAG_BLUR_BEHIND
+                        | WindowManager.LayoutParams.FLAG_DIM_BEHIND);
+                w.setDimAmount(0.12f);
+                w.setBackgroundBlurRadius(Ui.dp(a, Prefs.glassBlur(a)));
+                w.setBackgroundDrawable(new ColorDrawable(0x990D1725));
+            } else {
+                w.clearFlags(WindowManager.LayoutParams.FLAG_BLUR_BEHIND
+                        | WindowManager.LayoutParams.FLAG_DIM_BEHIND);
+                w.setBackgroundBlurRadius(0);
+                w.setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
+            }
+        }
+
+        // A user-selected image is loaded behind the translucent glass surfaces. Decode at
+        // screen-sized resolution to avoid retaining a full camera-resolution bitmap.
+        String wallpaper = Prefs.appearanceWallpaper(a);
+        if (wallpaper != null && !wallpaper.isEmpty()) {
+            try (java.io.InputStream in = a.getContentResolver().openInputStream(Uri.parse(wallpaper))) {
+                if (in != null) {
+                    BitmapFactory.Options bounds = new BitmapFactory.Options();
+                    bounds.inJustDecodeBounds = true;
+                    // SAF streams are not guaranteed to support mark/reset; reopen for decode.
+                    BitmapFactory.decodeStream(in, null, bounds);
+                    BitmapFactory.Options opts = new BitmapFactory.Options();
+                    int target = Math.max(a.getResources().getDisplayMetrics().widthPixels,
+                            a.getResources().getDisplayMetrics().heightPixels);
+                    int sample = 1;
+                    while (bounds.outWidth / sample > target * 2 || bounds.outHeight / sample > target * 2) sample *= 2;
+                    opts.inSampleSize = sample;
+                    try (java.io.InputStream image = a.getContentResolver().openInputStream(Uri.parse(wallpaper))) {
+                        Bitmap bitmap = BitmapFactory.decodeStream(image, null, opts);
+                        if (bitmap != null) w.getDecorView().setBackground(new BitmapDrawable(a.getResources(), bitmap));
+                    }
+                }
+            } catch (Exception ignored) {
+                Prefs.setAppearanceWallpaper(a, "");
+                w.getDecorView().setBackgroundColor(Color.TRANSPARENT);
+            }
+        } else {
+            w.getDecorView().setBackgroundColor(Color.TRANSPARENT);
+        }
     }
 
     /** Settings changed: recalc, and tell the bubble to restyle itself. */
