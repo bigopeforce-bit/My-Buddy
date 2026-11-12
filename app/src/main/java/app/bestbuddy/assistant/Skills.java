@@ -178,6 +178,23 @@ final class Skills {
         return name;
     }
 
+    /** Installs a downloaded marketplace SKILL.md after validating its metadata and expected slug. */
+    static String installMarkdown(Context c, String expectedName, String markdown) throws Exception {
+        if (markdown == null || markdown.length() > 2 * 1024 * 1024) {
+            throw new IllegalArgumentException(c.getString(R.string.skills_bad_file));
+        }
+        String[] fm = frontMatter(markdown);
+        String n = slug(fm[0]);
+        if (n.isEmpty() || !n.equals(expectedName) || fm[1].trim().isEmpty() || fm[2].trim().isEmpty()) {
+            throw new IllegalArgumentException(c.getString(R.string.skills_bad_file));
+        }
+        File d = new File(dir(c), n);
+        if (!d.exists() && !d.mkdirs()) throw new IllegalStateException("Could not create skill folder.");
+        if (!d.isDirectory()) throw new IllegalStateException("Skill path is not a directory.");
+        Linux.write(new File(d, "SKILL.md"), markdown);
+        return n;
+    }
+
     private static void copyAsset(AssetManager am, String path, File out) throws Exception {
         String[] kids = am.list(path);
         if (kids != null && kids.length > 0) {

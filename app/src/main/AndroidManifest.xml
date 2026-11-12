@@ -131,6 +131,10 @@
             android:exported="false" />
 
         <activity
+            android:name=".FreeSkillsActivity"
+            android:exported="false" />
+
+        <activity
             android:name=".GitHubActivity"
             android:exported="false" />
 
