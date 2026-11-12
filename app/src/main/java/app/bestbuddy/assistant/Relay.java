@@ -255,7 +255,10 @@ final class Relay {
             if (body.length > 0) model = new org.json.JSONObject(new String(body, StandardCharsets.UTF_8)).optString("model", "");
         } catch (Exception ignored) {}
         String route = parts.length == 3 ? parts[2].toLowerCase(Locale.ROOT) : "";
-        // Provider inference APIs are POST-based. Guard every non-read request, not just the common chat routes:\n        // otherwise legacy /completions or other POST endpoints could use a provider-side paid default model.\n        boolean modelRequest = (!"GET".equalsIgnoreCase(method) && !"HEAD".equalsIgnoreCase(method))\n                || route.contains("chat/completions") || route.endsWith("responses") || route.endsWith("messages");
+        // Provider inference APIs are POST-based. Guard every non-read request, not just the common chat routes:
+        // otherwise legacy /completions or other POST endpoints could use a provider-side paid default model.
+        boolean modelRequest = (!"GET".equalsIgnoreCase(method) && !"HEAD".equalsIgnoreCase(method))
+                || route.contains("chat/completions") || route.endsWith("responses") || route.endsWith("messages");
         if (modelRequest && model.isEmpty()) {
             error(out, 403, "BestBuddy requires an explicitly selected, verified free model for inference requests.");
             return;
@@ -293,16 +296,21 @@ final class Relay {
             }
         }
         int code = con.getResponseCode();
-        StringBuilder h = new StringBuilder("HTTP/1.1 ").append(code).append(" Relayed\r\n");
+        StringBuilder h = new StringBuilder("HTTP/1.1 ").append(code).append(" Relayed\r
+");
         for (Map.Entry<String, List<String>> e : con.getHeaderFields().entrySet()) {
             String n = e.getKey();
             if (n == null) continue;
             String l = n.toLowerCase(Locale.ROOT);
             if (l.equals("content-length") || l.equals("content-encoding") || l.equals("transfer-encoding")
                     || l.equals("connection") || l.startsWith("x-android")) continue;
-            for (String v : e.getValue()) h.append(n).append(": ").append(v).append("\r\n");
+            for (String v : e.getValue()) h.append(n).append(": ").append(v).append("\r
+");
         }
-        h.append("Transfer-Encoding: chunked\r\nConnection: close\r\n\r\n");
+        h.append("Transfer-Encoding: chunked\r
+Connection: close\r
+\r
+");
         out.write(h.toString().getBytes(StandardCharsets.UTF_8));
         out.flush();
         // as it arrives: replies stream token by token
@@ -310,33 +318,44 @@ final class Relay {
             if (in != null && code >= 400) { // an error may quote the key back, and the agent must never see it
                 byte[] said = hideKey(read(in), key).getBytes(StandardCharsets.UTF_8);
                 if (said.length > 0) {
-                    out.write((Integer.toHexString(said.length) + "\r\n").getBytes(StandardCharsets.US_ASCII));
+                    out.write((Integer.toHexString(said.length) + "\r
+").getBytes(StandardCharsets.US_ASCII));
                     out.write(said);
-                    out.write("\r\n".getBytes(StandardCharsets.US_ASCII));
+                    out.write("\r
+".getBytes(StandardCharsets.US_ASCII));
                     out.flush();
                 }
             } else if (in != null) {
                 byte[] buf = new byte[16 * 1024];
                 int n;
                 while ((n = in.read(buf)) > 0) {
-                    out.write((Integer.toHexString(n) + "\r\n").getBytes(StandardCharsets.US_ASCII));
+                    out.write((Integer.toHexString(n) + "\r
+").getBytes(StandardCharsets.US_ASCII));
                     out.write(buf, 0, n);
-                    out.write("\r\n".getBytes(StandardCharsets.US_ASCII));
+                    out.write("\r
+".getBytes(StandardCharsets.US_ASCII));
                     out.flush();
                 }
             }
         } finally {
             con.disconnect();
         }
-        out.write("0\r\n\r\n".getBytes(StandardCharsets.US_ASCII));
+        out.write("0\r
+\r
+".getBytes(StandardCharsets.US_ASCII));
         out.flush();
     }
 
     private static void error(OutputStream out, int code, String message) throws Exception {
         byte[] b = new org.json.JSONObject().put("type", "error").put("error", new org.json.JSONObject()
                 .put("type", "authentication_error").put("message", message)).toString().getBytes(StandardCharsets.UTF_8);
-        out.write(("HTTP/1.1 " + code + " Error\r\nContent-Type: application/json\r\nContent-Length: " + b.length
-                + "\r\nConnection: close\r\n\r\n").getBytes(StandardCharsets.US_ASCII));
+        out.write(("HTTP/1.1 " + code + " Error\r
+Content-Type: application/json\r
+Content-Length: " + b.length
+                + "\r
+Connection: close\r
+\r
+").getBytes(StandardCharsets.US_ASCII));
         out.write(b);
         out.flush();
     }
