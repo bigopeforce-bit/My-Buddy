@@ -14,7 +14,7 @@
 #   buddy-run <token> transcript <claude|codex> <file>   last messages of a session (buddy_transcript)
 #   buddy-run <token> adopt <session> <claude|codex> <agent-session-id>  continue that session as a Buddy chat
 # Every event sent to the bubble carries "buddy_session" so the app can route it.
-HELPER_VERSION=26
+HELPER_VERSION=27
 set -u
 export PATH=$HOME/.local/bin:$HOME/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 # The claude launcher sets BUN_OPTIONS with a path relative to its folder; never inherit a stale one.
@@ -621,6 +621,13 @@ run_agy() {
     '{permissions:{allow:([$t[] | "mcp(phone/\(.))"] + ["read_file(\($files))", "read_file(\($brain))"])}}' \
     > "$h/.gemini/antigravity-cli/settings.json"
   local prompt=$MSG args names note
+  if [ ${#IMGS[@]} -gt 0 ]; then
+    prompt="$prompt
+
+The user attached image file(s) in $S/files:
+$(printf -- '- %s\n' "${IMGS[@]}")
+Inspect the actual image content. Do not claim that this chat cannot accept images merely because it is a phone-agent mode. Use the image/file reading capability available to this agent. If this particular model or provider genuinely rejects image input, report that exact provider limitation and ask to switch to a vision-capable model; do not ask the user to describe an image you have not attempted to inspect."
+  fi
   # agy has no system-prompt flag, so Buddy's instructions lead a new conversation's first message (as for Codex).
   # It also lists MCP tools only by file: say how to call the phone's, or it goes looking (e.g. with ls, which a
   # normal chat refuses, and then it stops).
@@ -777,7 +784,17 @@ run_gemini() {
       printf '\n'
     } > "$h/.gemini/GEMINI.md"
   )
-  local args=(-p "$MSG" --output-format stream-json)
+  local prompt=$MSG f
+  if [ ${#IMGS[@]} -gt 0 ]; then
+    # Gemini CLI's @path syntax sends image bytes as multimodal input; include-directories alone only grants file access.
+    local refs=""
+    for f in "${IMGS[@]}"; do refs+=" @$f"; done
+    prompt="$prompt
+
+Please inspect the attached image(s) directly. They are supplied as Gemini image references:$refs
+Do not say image input is unsupported without first attempting to inspect these references. If this model/provider explicitly rejects image input, explain that limitation and request a vision-capable model."
+  fi
+  local args=(-p "$prompt" --output-format stream-json)
   [ -s "$S/gemini-session" ] && args+=(--resume "$(cat "$S/gemini-session")")
   [ -n "${MODEL:-}" ] && args+=(--model "$MODEL")
   [ "$DEV" = 1 ] && args+=(--approval-mode yolo)
