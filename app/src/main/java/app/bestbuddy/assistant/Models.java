@@ -256,6 +256,10 @@ final class Models {
             org.json.JSONArray a = new org.json.JSONArray(Prefs.fallbacks(BestBuddyApp.context(), backend));
             for (int i = 0; i < a.length(); i++) {
                 String m = a.optString(i);
+                if (m.startsWith("@")) {
+                    Providers.P provider = Providers.of(m);
+                    if (provider == null || !Providers.freeModel(provider, Providers.model(m))) continue;
+                }
                 if (!m.isEmpty() && !out.contains(m)) out.add(m);
             }
         } catch (Exception ignored) {
