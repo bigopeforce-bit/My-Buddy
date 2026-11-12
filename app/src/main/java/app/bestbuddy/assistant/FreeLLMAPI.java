@@ -69,7 +69,7 @@ final class FreeLLMAPI {
                 if (!Linux.installed(app)) throw new IllegalStateException("Install BestBuddy Linux first from Settings.");
                 if (!installed(app)) {
                     report(listener, "Installing Node.js, npm and build tools in Alpine…", false, false);
-                    String setup = "set -e; apk add --no-cache nodejs npm git python3 make g++; " +
+                    String setup = "set -e; apk add --no-cache nodejs npm git python3 make g++ linux-headers; " +
                             "mkdir -p /root/.bestbuddy; " +
                             "if [ ! -d " + DIR + "/.git ]; then git clone --depth 1 https://github.com/tashfeenahmed/freellmapi.git " + DIR + "; " +
                             "else git -C " + DIR + " pull --ff-only; fi; " +
