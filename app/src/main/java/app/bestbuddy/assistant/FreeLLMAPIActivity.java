@@ -96,6 +96,13 @@ public class FreeLLMAPIActivity extends Screen {
         refresh();
     }
 
+    /** Layout params with a top margin, used to separate controls in this screen. */
+    private LinearLayout.LayoutParams gap(int topDp) {
+        LinearLayout.LayoutParams params = full();
+        params.topMargin = dp(this, topDp);
+        return params;
+    }
+
     private String selectedPlatform(String key) {
         String detected = FreeLLMAPIOnboarding.detectPlatform(key);
         if (!detected.isEmpty()) return detected;
