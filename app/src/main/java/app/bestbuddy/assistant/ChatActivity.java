@@ -639,6 +639,10 @@ public class ChatActivity extends Screen implements ChatHub.Listener, Browser.Li
                 ses.awake, on -> hub.setAwake(ses, on));
         sw.setPaddingRelative(dp(this, 4), dp(this, 12), dp(this, 4), dp(this, 12));
         c.addView(sw, full());
+        LinearLayout bg = switchRow(this, getString(R.string.chat_background), getString(R.string.chat_background_info),
+                ses.background, on -> hub.setBackground(ses, on));
+        bg.setPaddingRelative(dp(this, 4), dp(this, 12), dp(this, 4), dp(this, 12));
+        c.addView(bg, full());
         LinearLayout inc = switchRow(this, getString(R.string.chat_incognito), getString(R.string.chat_incognito_info),
                 ses.incognito, on -> hub.setIncognito(ses, on));
         inc.setPaddingRelative(dp(this, 4), dp(this, 12), dp(this, 4), dp(this, 12));

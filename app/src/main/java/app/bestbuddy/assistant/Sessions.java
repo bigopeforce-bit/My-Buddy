@@ -78,6 +78,8 @@ final class Sessions {
         boolean autoApprove;
         /** Long-task mode: the screen stays on while this chat works, and its end is a notification (see KeepAwake). */
         boolean awake;
+        /** Keep this run going while the user uses other apps; screen actions must refresh after user interaction. */
+        boolean background;
         /** Pinned to the top of the chat list. */
         boolean pinned;
         /** Archived: out of the chat list (it has an Archived section), the bubble and sharing; its schedules still run. */
@@ -335,7 +337,7 @@ final class Sessions {
         JSONObject o = new JSONObject().put("id", s.id).put("backend", s.backend).put("title", s.title).put("model", s.model)
                 .put("effort", s.effort).put("actual_model", s.actualModel).put("ctx_used", s.ctxUsed).put("ctx_window", s.ctxWindow)
                 .put("interrupted", s.interrupted).put("incognito", s.incognito).put("dev", s.dev).put("awake", s.awake)
-                .put("auto_approve", s.autoApprove)
+                .put("auto_approve", s.autoApprove).put("background", s.background)
                 .put("plan_used", s.planUsed)
                 .put("pinned", s.pinned).put("archived", s.archived).put("updated", s.updated).put("messages", msgs);
         if (s.schedule != null) {
@@ -370,6 +372,7 @@ final class Sessions {
         s.autoApprove = o.optBoolean("auto_approve");
         s.planUsed = o.optBoolean("plan_used");
         s.awake = o.optBoolean("awake");
+        s.background = o.optBoolean("background");
         s.pinned = o.optBoolean("pinned");
         s.archived = o.optBoolean("archived");
         s.schedule = Schedules.Plan.of(o.optJSONObject("schedule"));
