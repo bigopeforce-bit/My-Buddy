@@ -1,9 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- The BestBuddy logo, centred in the adaptive icon's safe zone. -->
+<!-- BestBuddy's new adaptive icon mark. -->
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
-    <item
-        android:width="84dp"
-        android:height="84dp"
-        android:gravity="center"
-        android:drawable="@drawable/logo_face" />
+    <item android:width="84dp" android:height="84dp" android:gravity="center"
+        android:drawable="@drawable/logo_mark" />
 </layer-list>
