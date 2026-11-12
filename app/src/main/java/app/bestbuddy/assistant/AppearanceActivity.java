@@ -2,6 +2,9 @@ package app.bestbuddy.assistant;
 
 import android.app.AlertDialog;
 import android.os.Bundle;
+import android.content.Intent;
+import android.net.Uri;
+import android.os.Build;
 import android.view.Gravity;
 import android.view.View;
 import android.widget.Button;
@@ -9,6 +12,7 @@ import android.widget.EditText;
 import android.widget.FrameLayout;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
+import android.widget.SeekBar;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -107,10 +111,60 @@ public final class AppearanceActivity extends Screen {
             if (end < options.length) styles.addView(new View(this), new LinearLayout.LayoutParams(1, dp(this, 6)));
         }
         TextView note = text(this,
-                "AMOLED uses true-black surfaces. Dynamic uses Android wallpaper colours on Android 12 and newer. Liquid Glass style uses layered translucent surfaces; actual system blur and refraction are not enabled.",
+                "AMOLED uses true-black surfaces. Dynamic reads Android's Material You palette. Liquid Glass enables Android's real backdrop blur on Android 12+; older versions use a translucent fallback.",
                 12, MUTED);
         styles.addView(note, topGap(10));
         content.addView(styles, topGap(8));
+
+        content.addView(sectionLabel(this, "Wallpaper and glass"));
+        LinearLayout glass = panel();
+        glass.addView(text(this, "Choose an image to show behind translucent Liquid Glass surfaces.", 13, MUTED));
+        Button wallpaper = button(this, Prefs.appearanceWallpaper(this).isEmpty()
+                ? "Choose wallpaper" : "Change wallpaper", false);
+        wallpaper.setOnClickListener(v -> chooseWallpaper());
+        glass.addView(wallpaper, topGap(10));
+        if (!Prefs.appearanceWallpaper(this).isEmpty()) {
+            Button clear = outlinedButton(this, "Remove wallpaper", MUTED);
+            clear.setOnClickListener(v -> {
+                Prefs.setAppearanceWallpaper(this, "");
+                changed();
+            });
+            glass.addView(clear, topGap(8));
+        }
+        TextView blurLabel = text(this, "Backdrop blur · " + Prefs.glassBlur(this) + " dp", 13, TEXT);
+        glass.addView(blurLabel, topGap(14));
+        SeekBar blur = new SeekBar(this);
+        blur.setMax(64);
+        blur.setProgress(Prefs.glassBlur(this));
+        blur.setEnabled(Build.VERSION.SDK_INT >= 31);
+        blur.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+            @Override public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
+                blurLabel.setText("Backdrop blur · " + progress + " dp");
+                if (fromUser) {
+                    Prefs.setGlassBlur(AppearanceActivity.this, progress);
+                    Theme.changed(AppearanceActivity.this);
+                    rethemed();
+                }
+            }
+            @Override public void onStartTrackingTouch(SeekBar seekBar) {}
+            @Override public void onStopTrackingTouch(SeekBar seekBar) { render(); }
+        });
+        glass.addView(blur, topGap(4));
+        glass.addView(text(this, Build.VERSION.SDK_INT >= 31
+                ? "Uses Android 12+ window backdrop blur. The effect is visible when Liquid Glass style is selected."
+                : "System backdrop blur requires Android 12 or newer; your device uses the translucent fallback.", 12, MUTED), topGap(4));
+        content.addView(glass, topGap(8));
+
+        content.addView(sectionLabel(this, "Motion"));
+        LinearLayout motion = panel();
+        motion.addView(text(this, "Controls screen entrance transitions throughout BestBuddy.", 13, MUTED));
+        motion.addView(segmented(this, new String[][]{
+                {"off", "Off"}, {"subtle", "Subtle"}, {"full", "Full"}
+        }, Prefs.motion(this), false, value -> {
+            Prefs.setMotion(this, value);
+            changed();
+        }), topGap(10));
+        content.addView(motion, topGap(8));
 
         content.addView(sectionLabel(this, "Typography"));
         LinearLayout type = panel();
@@ -170,6 +224,28 @@ public final class AppearanceActivity extends Screen {
                     Prefs.setAccent(this, parsed);
                     changed();
                 }).show();
+    }
+
+    private void chooseWallpaper() {
+        Intent pick = new Intent(Intent.ACTION_OPEN_DOCUMENT);
+        pick.addCategory(Intent.CATEGORY_OPENABLE);
+        pick.setType("image/*");
+        pick.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION);
+        startActivityForResult(pick, 7412);
+    }
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        if (requestCode != 7412 || resultCode != RESULT_OK || data == null || data.getData() == null) return;
+        Uri uri = data.getData();
+        try {
+            getContentResolver().takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION);
+            Prefs.setAppearanceWallpaper(this, uri.toString());
+            changed();
+        } catch (SecurityException e) {
+            Toast.makeText(this, "Could not keep access to that image. Please choose it again.", Toast.LENGTH_LONG).show();
+        }
     }
 
     private void changed() {
