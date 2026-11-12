@@ -658,6 +658,15 @@ final class Prefs {
         sp(c).edit().putString("agent_models_" + agent, json).apply();
     }
 
+    /** Whether the BestBuddy-managed FreeLLMAPI process should be restored when the accessibility service starts. */
+    static boolean freeLLMAPIEnabled(Context c) {
+        return sp(c).getBoolean("freellmapi_enabled", false);
+    }
+
+    static void setFreeLLMAPIEnabled(Context c, boolean on) {
+        sp(c).edit().putBoolean("freellmapi_enabled", on).apply();
+    }
+
     /** The proxy every request to a provider goes through ("host:port"; empty: none). See ProvidersActivity. */
     static String proxy(Context c) {
         return sp(c).getString("proxy", "");

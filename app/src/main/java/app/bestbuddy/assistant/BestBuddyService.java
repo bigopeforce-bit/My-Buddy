@@ -113,6 +113,7 @@ public class BestBuddyService extends AccessibilityService implements McpServer.
         Schedules.serviceStarted(this); // scheduled tasks' alarms, again after an update or a restart
         // the helper's answer refreshes Codex's model list
         main.postDelayed(() -> {
+            if (Linux.installed(this) && Prefs.freeLLMAPIEnabled(this)) FreeLLMAPI.ensureStarted(this);
             if (Linux.installed(this)) {
                 try {
                     Helper.run(this, "ping");

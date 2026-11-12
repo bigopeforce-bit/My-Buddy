@@ -115,6 +115,10 @@
             android:exported="false" />
 
         <activity
+            android:name=".FreeLLMAPIActivity"
+            android:exported="false" />
+
+        <activity
             android:name=".ModelsActivity"
             android:exported="false" />
 
