@@ -62,6 +62,17 @@ public final class AppearanceActivity extends Screen {
     private void render() {
         content.removeAllViews();
 
+        content.addView(sectionLabel(this, "Skin presets"));
+        LinearLayout skins = panel();
+        skins.addView(text(this, "Apply a complete BestBuddy colour treatment.", 13, MUTED));
+        String[][] skinOptions = {{"amoled","AMOLED"}, {"glass","Liquid Glass"}, {"cyberpunk","Cyberpunk"}, {"warm","Warm"}, {"dynamic","Dynamic"}};
+        for (String[] skin : skinOptions) {
+            Button choice = button(this, (Prefs.surface(this).equals(skin[0]) ? "✓  " : "") + skin[1], false);
+            choice.setOnClickListener(v -> { Prefs.setSurface(this, skin[0]); changed(); });
+            skins.addView(choice, topGap(7));
+        }
+        content.addView(skins, topGap(8));
+
         content.addView(sectionLabel(this, "Theme mode"));
         LinearLayout mode = panel();
         mode.addView(segmented(this, Theme.modes(this), Prefs.themeMode(this), false, value -> {
@@ -155,6 +166,28 @@ public final class AppearanceActivity extends Screen {
                 : "System backdrop blur requires Android 12 or newer; your device uses the translucent fallback.", 12, MUTED), topGap(4));
         content.addView(glass, topGap(8));
 
+        content.addView(sectionLabel(this, "Navigation dock"));
+        LinearLayout dock = panel();
+        dock.addView(text(this, "Tune the persistent Chats, Sessions and Settings navigation bar.", 13, MUTED));
+        addSwitch(dock, "Liquid dock", "Translucent rounded dock surface", Prefs.dockGlass(this), v -> { Prefs.setDockGlass(this, v); changed(); });
+        addSwitch(dock, "Dock highlights", "Show a subtle top-edge accent", Prefs.dockHighlights(this), v -> { Prefs.setDockHighlights(this, v); changed(); });
+        addSwitch(dock, "Dock reflection", "Show a soft lower reflection line", Prefs.dockReflection(this), v -> { Prefs.setDockReflection(this, v); changed(); });
+        content.addView(dock, topGap(8));
+
+        content.addView(sectionLabel(this, "Display size"));
+        LinearLayout display = panel();
+        display.addView(segmented(this, new String[][]{{"compact","Compact"},{"standard","Standard"},{"large","Large"}}, Prefs.displaySize(this), false, value -> {
+            Prefs.setDisplaySize(this, value);
+            Theme.changed(this);
+            recreate();
+        }));
+        content.addView(display, topGap(8));
+
+        content.addView(sectionLabel(this, "Colour treatment"));
+        LinearLayout colourTreatment = panel();
+        addSwitch(colourTreatment, "Saturated colours", "Increase accent colour intensity across BestBuddy.", Prefs.saturatedColours(this), v -> { Prefs.setSaturatedColours(this, v); changed(); });
+        content.addView(colourTreatment, topGap(8));
+
         content.addView(sectionLabel(this, "Motion"));
         LinearLayout motion = panel();
         motion.addView(text(this, "Controls screen entrance transitions throughout BestBuddy.", 13, MUTED));
@@ -191,6 +224,21 @@ public final class AppearanceActivity extends Screen {
         LinearLayout.LayoutParams lp = full();
         lp.topMargin = dp(this, value);
         return lp;
+    }
+
+    private void addSwitch(LinearLayout parent, String name, String detail, boolean checked,
+                           java.util.function.Consumer<Boolean> onChange) {
+        LinearLayout line = row(this);
+        line.setGravity(Gravity.CENTER_VERTICAL);
+        LinearLayout labels = column(this);
+        labels.addView(title(this, name, 14));
+        labels.addView(text(this, detail, 12, MUTED));
+        line.addView(labels, weight1());
+        android.widget.Switch toggle = new android.widget.Switch(this);
+        toggle.setChecked(checked);
+        toggle.setOnCheckedChangeListener((button, value) -> onChange.accept(value));
+        line.addView(toggle);
+        parent.addView(line, topGap(12));
     }
 
     private LinearLayout panel() {
