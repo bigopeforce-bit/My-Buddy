@@ -344,16 +344,16 @@ final class Relay {
             }
         }
 
-        StringBuilder responseHeaders = new StringBuilder("HTTP/1.1 ").append(code).append(" Relayed\\r\\n");
+        StringBuilder responseHeaders = new StringBuilder("HTTP/1.1 ").append(code).append(" Relayed\r\n");
         for (Map.Entry<String, List<String>> e : con.getHeaderFields().entrySet()) {
             String n = e.getKey();
             if (n == null) continue;
             String lower = n.toLowerCase(Locale.ROOT);
             if (lower.equals("content-length") || lower.equals("content-encoding") || lower.equals("transfer-encoding")
                     || lower.equals("connection") || lower.startsWith("x-android")) continue;
-            for (String v : e.getValue()) responseHeaders.append(n).append(": ").append(v).append("\\r\\n");
+            for (String v : e.getValue()) responseHeaders.append(n).append(": ").append(v).append("\r\n");
         }
-        responseHeaders.append("Transfer-Encoding: chunked\\r\\nConnection: close\\r\\n\\r\\n");
+        responseHeaders.append("Transfer-Encoding: chunked\r\nConnection: close\r\n\r\n");
         out.write(responseHeaders.toString().getBytes(StandardCharsets.UTF_8));
         out.flush();
         try {
@@ -361,9 +361,9 @@ final class Relay {
                 byte[] said = hideKey(new String(errorBody == null ? new byte[0] : errorBody, StandardCharsets.UTF_8), key)
                         .getBytes(StandardCharsets.UTF_8);
                 if (said.length > 0) {
-                    out.write((Integer.toHexString(said.length) + "\\r\\n").getBytes(StandardCharsets.US_ASCII));
+                    out.write((Integer.toHexString(said.length) + "\r\n").getBytes(StandardCharsets.US_ASCII));
                     out.write(said);
-                    out.write("\\r\\n".getBytes(StandardCharsets.US_ASCII));
+                    out.write("\r\n".getBytes(StandardCharsets.US_ASCII));
                     out.flush();
                 }
             } else {
@@ -371,15 +371,15 @@ final class Relay {
                     byte[] buf = new byte[16 * 1024];
                     int n;
                     while ((n = in.read(buf)) > 0) {
-                        out.write((Integer.toHexString(n) + "\\r\\n").getBytes(StandardCharsets.US_ASCII));
+                        out.write((Integer.toHexString(n) + "\r\n").getBytes(StandardCharsets.US_ASCII));
                         out.write(buf, 0, n);
-                        out.write("\\r\\n".getBytes(StandardCharsets.US_ASCII));
+                        out.write("\r\n".getBytes(StandardCharsets.US_ASCII));
                         out.flush();
                     }
                 }
             }
         } finally { con.disconnect(); }
-        out.write("0\\r\\n\\r\\n".getBytes(StandardCharsets.US_ASCII));
+        out.write("0\r\n\r\n".getBytes(StandardCharsets.US_ASCII));
         out.flush();
     }
 
