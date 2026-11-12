@@ -73,7 +73,12 @@ final class FreeLLMAPIOnboarding {
         String command = "cd /root/.bestbuddy/freellmapi && set -a && . ./.env && set +a && node --input-type=module -e 'import {getUnifiedApiKey} from \"./server/dist/db/index.js\"; console.log(getUnifiedApiKey())'";
         String output = Linux.exec(c, command, 30);
         if (!output.contains("[exit 0]")) throw new IllegalStateException("Provider saved, but BestBuddy could not retrieve the local unified key: " + tail(output));
-        String unified = output.substring(0, output.lastIndexOf("[exit 0]")).trim();
+        String unified = "";
+        String[] outputLines = output.substring(0, output.lastIndexOf("[exit 0]")).split("\\r?\\n");
+        for (int i = outputLines.length - 1; i >= 0; i--) {
+            String candidate = outputLines[i].trim();
+            if (isUnified(candidate)) { unified = candidate; break; }
+        }
         if (!isUnified(unified)) throw new IllegalStateException("FreeLLMAPI returned an unexpected unified-key format.");
         saveUnifiedKey(c, unified);
         return "Provider connected. BestBuddy saved the unified FreeLLMAPI key securely.";
