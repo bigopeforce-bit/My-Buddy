@@ -48,9 +48,11 @@ final class Providers {
         }
 
         String defaultModel() {
-            if (!model.isEmpty() || models.length() == 0) return model;
-            List<String> chat = chatModels(offered());
-            return chat.isEmpty() ? offered().optJSONObject(0).optString("id") : chat.get(0);
+            if (!model.isEmpty() && isFreeId(model)) return model;
+            JSONArray free = offered();
+            if (free.length() == 0) return "";
+            List<String> chat = chatModels(free);
+            return chat.isEmpty() ? free.optJSONObject(0).optString("id") : chat.get(0);
         }
 
         JSONObject modelInfo(String m) {
@@ -69,19 +71,33 @@ final class Providers {
 
     /** Presets for the editor: name, Anthropic-style address, OpenAI-style address, Chat Completions only. */
     static final String[][] PRESETS = {
-            {"DeepSeek", "https://api.deepseek.com/anthropic", "https://api.deepseek.com", ""},
-            {"OpenRouter", "https://openrouter.ai/api", "https://openrouter.ai/api/v1", "chat"},
-            {"Anthropic", "https://api.anthropic.com", "", ""},
-            {"OpenAI", "", "https://api.openai.com/v1", ""},
+            {"OpenRouter (free models)", "https://openrouter.ai/api", "https://openrouter.ai/api/v1", "chat"},
             // Kilo Gateway: one address for many models, among them the free router "kilo-auto/free"
-            {"Kilo", "", "https://api.kilo.ai/api/gateway/v1", ""},
+            {"Kilo (free router)", "", "https://api.kilo.ai/api/gateway/v1", "chat"},
             // your own server: on this phone as given, or on a PC with its address on your network instead of localhost
-            {"Ollama", "", "http://localhost:11434/v1", ""},
-            // BestBuddy-managed FreeLLMAPI router (one unified key for its configured upstream providers)
-            {"FreeLLMAPI", "", "http://127.0.0.1:3001/v1", "chat"},
-            {"LM Studio", "", "http://localhost:1234/v1", ""},
-            {"llama.cpp", "", "http://localhost:8080/v1", ""},
+            {"Ollama (local)", "", "http://localhost:11434/v1", ""},
+            // BestBuddy-managed gateway: only models whose API metadata confirms free pricing are exposed.
+            {"FreeLLMAPI (free models only)", "", "http://127.0.0.1:3001/v1", "chat"},
+            {"LM Studio (local)", "", "http://localhost:1234/v1", ""},
+            {"llama.cpp (local)", "", "http://localhost:8080/v1", ""},
     };
+
+    static boolean isFreeId(String id) {
+        return id != null && id.toLowerCase(java.util.Locale.ROOT).endsWith(":free");
+    }
+
+    /** Free only when metadata confirms it, the route is explicitly free, or the endpoint is local. */
+    static boolean freeModel(P provider, JSONObject model) {
+        if (model == null) return false;
+        if (isLocal(provider.openai.isEmpty() ? provider.anthropic : provider.openai)) return true;
+        return model.optBoolean("free", false) || isFreeId(model.optString("id"));
+    }
+
+    static boolean freeModel(P provider, String modelId) {
+        if (isLocal(provider.openai.isEmpty() ? provider.anthropic : provider.openai)) return true;
+        JSONObject info = provider.modelInfo(modelId);
+        return info != null && freeModel(provider, info);
+    }
 
     /**
      * An address on this phone or on the user's own network (private IPv4 ranges, Tailscale's 100.64/10, *.local):
@@ -277,6 +293,10 @@ final class Providers {
         String key = Secrets.get(c, secretName(p.id));
         if (key == null && !keyless(p.openai.isEmpty() ? p.anthropic : p.openai)) return;
         p.models = list(key == null ? "" : key, p.anthropic, p.openai);
+        String endpoint = p.openai.isEmpty() ? p.anthropic : p.openai;
+        if (isLocal(endpoint)) {
+            for (int i = 0; i < p.models.length(); i++) p.models.optJSONObject(i).put("free", true);
+        }
         store(c);
     }
 
