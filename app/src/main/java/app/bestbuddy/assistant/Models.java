@@ -114,7 +114,7 @@ final class Models {
         if (p == null) return out;
         for (int i = 0; i < p.models.length(); i++) {
             org.json.JSONObject m = p.models.optJSONObject(i);
-            if (m == null) continue;
+            if (m == null || !Providers.freeModel(p, m)) continue;
             String id = m.optString("id");
             String name = m.optString("name");
             out.add(new String[]{id, name.isEmpty() ? id : name});
@@ -220,7 +220,7 @@ final class Models {
             return s == null ? d : s;
         }
         Providers.P p = Providers.of(d);
-        if (p == null || !p.fits(backend)) return "";
+        if (p == null || !p.fits(backend) || !Providers.freeModel(p, Providers.model(d))) return "";
         String m = Providers.model(d);
         return Providers.ref(p, m.isEmpty() ? p.defaultModel() : m);
     }
