@@ -212,9 +212,11 @@ final class Models {
     static String agentDefault(String backend) {
         String d = Prefs.agentDefault(BestBuddyApp.context(), backend);
         if (!d.startsWith("@")) {
-            // one of the agent's own models (e.g. kilo-auto/free), or the plain id of a service's model
+            // A plain ID may be a legacy API-service default; never reinterpret a known paid service model as an agent model.
             String s = serviceModel(backend, d);
-            return s == null ? d : s;
+            if (s != null) return s;
+            for (Providers.P provider : Providers.all()) if (provider.modelInfo(d) != null) return "";
+            return d;
         }
         Providers.P p = Providers.of(d);
         if (p == null || !p.fits(backend) || !Providers.freeModel(p, Providers.model(d))) return "";
