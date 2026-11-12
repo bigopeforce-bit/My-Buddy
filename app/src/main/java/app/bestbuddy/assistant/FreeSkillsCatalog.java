@@ -11,10 +11,10 @@ import java.util.List;
 final class FreeSkillsCatalog {
     static final String ALL = "All stores";
     static final class Item {
-        final String store, name, title, description, license, source, url;
-        Item(String store, String name, String title, String description, String license, String source, String url) {
+        final String store, name, title, description, license, source, revision, url;
+        Item(String store, String name, String title, String description, String license, String source, String revision, String url) {
             this.store = store; this.name = name; this.title = title; this.description = description;
-            this.license = license; this.source = source; this.url = url;
+            this.license = license; this.source = source; this.revision = revision; this.url = url;
         }
     }
 
@@ -43,9 +43,21 @@ final class FreeSkillsCatalog {
     }
 
     private FreeSkillsCatalog() {}
+    private static String pinnedRevision(String repo) {
+        // Immutable upstream commits: marketplace content cannot silently change between installs.
+        switch (repo) {
+            case "obra/superpowers": return "22f0b463e7a5e579904dd6211a520321035526f7";
+            case "huggingface/skills": return "25910b3d0ba31a2ba102f901cdc9e008c278a69c";
+            case "github/awesome-copilot": return "30a0d7465b14b05e05949d6588b99f7af0c537b4";
+            case "wshobson/agents": return "9c61ab243def98f72da12abd41cfcf5bcd91af9d";
+            default: throw new IllegalArgumentException("Skill source is not pinned: " + repo);
+        }
+    }
+
     private static void add(String store, String name, String title, String desc, String license, String repo, String path) {
-        ITEMS.add(new Item(store, name, title, desc, license, repo,
-                "https://raw.githubusercontent.com/" + repo + "/main/" + path));
+        String revision = pinnedRevision(repo);
+        ITEMS.add(new Item(store, name, title, desc, license, repo, revision,
+                "https://raw.githubusercontent.com/" + repo + "/" + revision + "/" + path));
     }
     static List<String> stores() {
         List<String> out = new ArrayList<>(); out.add(ALL);
