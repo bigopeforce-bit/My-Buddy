@@ -493,6 +493,8 @@
     <string name="chat_keep_awake">Keep the screen on while it works</string>
     <!-- Under that switch. -->
     <string name="chat_keep_awake_info">For long tasks: the phone stays awake while this chat works, and a notification says how it went. Locking the phone still turns the screen off.</string>
+    <string name="chat_background">Keep working while I use my phone</string>
+    <string name="chat_background_info">BestBuddy keeps this task running when you switch apps or touch the screen. It refreshes the screen before continuing phone actions so it does not use stale controls. You can still stop the task at any time.</string>
     <!-- Section title in Chat options: apps where this chat's routine approvals need no card until its task ends. -->
     <string name="chat_allowed">Allowed without asking</string>
     <!-- Under that title. "The reviewer" = BestBuddy's smart reviewer (App permissions). -->
