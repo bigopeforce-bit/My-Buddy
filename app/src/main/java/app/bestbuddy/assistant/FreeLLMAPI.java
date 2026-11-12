@@ -5,8 +5,8 @@ import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.InputStreamReader;
-import java.net.InetSocketAddress;
-import java.net.Socket;
+import java.net.HttpURLConnection;
+import java.net.URL;
 import java.nio.charset.StandardCharsets;
 
 /**
@@ -34,12 +34,18 @@ final class FreeLLMAPI {
     }
 
     static boolean running() {
-        if (process != null && process.isAlive()) return true;
-        try (Socket s = new Socket()) {
-            s.connect(new InetSocketAddress("127.0.0.1", PORT), 350);
-            return true;
+        try {
+            HttpURLConnection connection = (HttpURLConnection) new URL("http://127.0.0.1:" + PORT + "/").openConnection();
+            connection.setConnectTimeout(700);
+            connection.setReadTimeout(700);
+            connection.setRequestMethod("GET");
+            int code = connection.getResponseCode();
+            connection.disconnect();
+            return code >= 200 && code < 400;
         } catch (Exception e) { return false; }
     }
+
+    static boolean installing() { return installing; }
 
     static synchronized void ensureStarted(Context c) {
         if (!installed(c) || running()) return;
@@ -78,7 +84,7 @@ final class FreeLLMAPI {
                 }
                 report(listener, "Starting the local FreeLLMAPI server…", false, false);
                 start(app);
-                long until = System.currentTimeMillis() + 25_000;
+                long until = System.currentTimeMillis() + 60_000;
                 while (System.currentTimeMillis() < until && !running()) Thread.sleep(500);
                 if (!running()) throw new IllegalStateException("The server did not open port 3001. Open the setup log for details.");
                 ok = true;
