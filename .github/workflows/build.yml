@@ -41,15 +41,38 @@ jobs:
         env:
           NDK_VERSION: 27.2.12479018
 
-      # Release signing is optional: add the BUDDY_KEYSTORE_BASE64 and BUDDY_KEYSTORE_PASSWORD
-      # repository secrets to get a signed APK; otherwise the APK is unsigned.
-      - name: Decode signing key
+      # Use a persistent repository signing key when configured. For the first installable
+      # build, create a one-time install key and publish it beside the APK so it can be preserved.
+      # Add BUDDY_KEYSTORE_BASE64 + BUDDY_KEYSTORE_PASSWORD as repository secrets for future updates.
+      - name: Prepare release signing key
         env:
           KEYSTORE_BASE64: ${{ secrets.BUDDY_KEYSTORE_BASE64 }}
-        if: env.KEYSTORE_BASE64 != ''
+          KEYSTORE_PASSWORD_SECRET: ${{ secrets.BUDDY_KEYSTORE_PASSWORD }}
         run: |
-          echo "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/release.jks"
+          if [[ -n "$KEYSTORE_BASE64" && -n "$KEYSTORE_PASSWORD_SECRET" ]]; then
+            echo "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/release.jks"
+            echo "$KEYSTORE_PASSWORD_SECRET" > "$RUNNER_TEMP/signing-password.txt"
+            echo "BUDDY_KEYSTORE_PASSWORD=$KEYSTORE_PASSWORD_SECRET" >> "$GITHUB_ENV"
+          else
+            KEYSTORE_PASSWORD="$(openssl rand -hex 24)"
+            keytool -genkeypair -noprompt -keystore "$RUNNER_TEMP/release.jks" \
+              -storepass "$KEYSTORE_PASSWORD" -keypass "$KEYSTORE_PASSWORD" \
+              -alias buddy -keyalg RSA -keysize 3072 -validity 10000 \
+              -dname "CN=BestBuddy Release, OU=Android, O=BestBuddy, L=Lagos, ST=Lagos, C=NG"
+            echo "$KEYSTORE_PASSWORD" > "$RUNNER_TEMP/signing-password.txt"
+            echo "BUDDY_KEYSTORE_PASSWORD=$KEYSTORE_PASSWORD" >> "$GITHUB_ENV"
+          fi
           echo "BUDDY_KEYSTORE=$RUNNER_TEMP/release.jks" >> "$GITHUB_ENV"
+
+      - name: Preserve signing key for future updates
+        uses: actions/upload-artifact@v7
+        if: ${{ !secrets.BUDDY_KEYSTORE_BASE64 }}
+        with:
+          name: bestbuddy-signing-key
+          path: |
+            ${{ runner.temp }}/release.jks
+            ${{ runner.temp }}/signing-password.txt
+          retention-days: 90
 
       # github: the release here. fdroid: F-Droid builds it from this source too, and ships this signed copy when its
       # own build comes out identical (reproducible builds), so users can switch between the two.
