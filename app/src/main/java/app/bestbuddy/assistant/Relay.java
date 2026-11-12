@@ -254,7 +254,7 @@ final class Relay {
         try {
             if (body.length > 0) model = new org.json.JSONObject(new String(body, StandardCharsets.UTF_8)).optString("model", "");
         } catch (Exception ignored) {}
-        if (!model.isEmpty() && !Providers.freeModel(p, model)) {
+        if (!model.isEmpty() && (p == null || !Providers.freeModel(p, model))) {
             error(out, 403, "BestBuddy is in free-model-only mode. This model is not verified as free and was not sent.");
             return;
         }
