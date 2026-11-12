@@ -866,6 +866,7 @@ final class ChatHub {
 
     private void startRun(Sessions.Session ses) {
         ses.running = true;
+        AndroidTaskService.start(app);
         ses.outcome = null;
         ses.gotText = false;
         ses.lastReply = "";
@@ -883,6 +884,7 @@ final class ChatHub {
     private void runEnded(Sessions.Session ses) {
         Prefs.setBusy(app, ses.id, false);
         StepLog.runEnded(app, ses);
+        if (runningCount() == 0) AndroidTaskService.stop(app);
         if (ses.schedule == null) ses.allowed.clear(); // a scheduled chat keeps them for its next scheduled run
         CodexLive.agentDone(ses, ses.outcome, !ses.lastReply.isEmpty());
         // a quiet scheduled run that found nothing new ends without a notification (a failed one always says so)
