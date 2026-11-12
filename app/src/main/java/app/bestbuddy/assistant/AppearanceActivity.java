@@ -4,6 +4,7 @@ import android.app.AlertDialog;
 import android.os.Bundle;
 import android.view.Gravity;
 import android.view.View;
+import android.widget.Button;
 import android.widget.EditText;
 import android.widget.FrameLayout;
 import android.widget.LinearLayout;
@@ -103,7 +104,7 @@ public final class AppearanceActivity extends Screen {
                 Prefs.setSurface(this, value);
                 changed();
             }));
-            if (end < options.length) styles.addView(new View(this), topGap(6));
+            if (end < options.length) styles.addView(new View(this), new LinearLayout.LayoutParams(1, dp(this, 6)));
         }
         TextView note = text(this,
                 "AMOLED uses true-black surfaces. Dynamic uses Android wallpaper colours on Android 12 and newer. Liquid Glass style uses layered translucent surfaces; actual system blur and refraction are not enabled.",
@@ -130,6 +131,12 @@ public final class AppearanceActivity extends Screen {
         preview.addView(text(this, "A preview of the selected palette and typography.", 13, MUTED), topGap(4));
         preview.addView(button(this, "Primary action", true), topGap(14));
         content.addView(preview, topGap(8));
+    }
+
+    private LinearLayout.LayoutParams topGap(int value) {
+        LinearLayout.LayoutParams lp = full();
+        lp.topMargin = dp(this, value);
+        return lp;
     }
 
     private LinearLayout panel() {
