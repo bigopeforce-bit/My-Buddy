@@ -162,6 +162,60 @@ public class MainActivity extends Screen implements ChatHub.Listener, Account.Li
         top.addView(name, weight1());
         list.addView(top, full());
 
+        // New BestBuddy home dashboard: a compact welcome panel and direct entry points.
+        LinearLayout hero = column(this);
+        hero.setPaddingRelative(dp(this, 18), dp(this, 18), dp(this, 18), dp(this, 18));
+        hero.setBackground(rounded(this, CARD2, 22));
+        TextView eyebrow = monoText(this, "YOUR AI WORKSPACE", 10, ACCENT_TEXT);
+        eyebrow.setLetterSpacing(0.12f);
+        hero.addView(eyebrow);
+        TextView headline = title(this, "What can we\u2019ll do today?", 23);
+        headline.setPaddingRelative(0, dp(this, 7), 0, dp(this, 4));
+        hero.addView(headline);
+        TextView subline = text(this, ready ? "Your assistants and tools are ready when you are."
+                : "Finish setup once, then start working with your assistants.", 13, MUTED);
+        hero.addView(subline);
+        LinearLayout actions = row(this);
+        actions.setPaddingRelative(0, dp(this, 16), 0, 0);
+        TextView start = title(this, "＋  New chat", 14);
+        start.setTextColor(ON_ACCENT);
+        start.setGravity(Gravity.CENTER);
+        start.setBackground(rounded(this, ACCENT, 14));
+        start.setPaddingRelative(dp(this, 16), dp(this, 12), dp(this, 16), dp(this, 12));
+        start.setOnClickListener(v -> newChatSheet());
+        actions.addView(start, new LinearLayout.LayoutParams(0, dp(this, 46), 1));
+        TextView tools = title(this, "  Explore tools  ", 14);
+        tools.setGravity(Gravity.CENTER);
+        tools.setBackground(outlined(this, BG, 14, OUTLINE, 1));
+        tools.setPaddingRelative(dp(this, 12), dp(this, 12), dp(this, 12), dp(this, 12));
+        tools.setOnClickListener(v -> go(PhoneToolActivity.class));
+        LinearLayout.LayoutParams toolsLp = new LinearLayout.LayoutParams(0, dp(this, 46), 1);
+        toolsLp.setMarginStart(dp(this, 9));
+        actions.addView(tools, toolsLp);
+        hero.addView(actions);
+        LinearLayout.LayoutParams heroLp = full();
+        heroLp.leftMargin = heroLp.rightMargin = dp(this, 16);
+        heroLp.topMargin = dp(this, 8);
+        heroLp.bottomMargin = dp(this, 10);
+        list.addView(hero, heroLp);
+
+        LinearLayout overview = row(this);
+        overview.setPaddingRelative(dp(this, 16), dp(this, 2), dp(this, 16), dp(this, 8));
+        int totalChats = 0;
+        int activeChats = 0;
+        for (Sessions.Session item : hub.sessions.all) {
+            if (!item.archived && !item.messages.isEmpty()) totalChats++;
+            if (item.running) activeChats++;
+        }
+        overview.addView(metricCard("CHATS", String.valueOf(totalChats)), new LinearLayout.LayoutParams(0, dp(this, 68), 1));
+        LinearLayout.LayoutParams activeLp = new LinearLayout.LayoutParams(0, dp(this, 68), 1);
+        activeLp.setMarginStart(dp(this, 8));
+        overview.addView(metricCard("RUNNING", String.valueOf(activeChats)), activeLp);
+        LinearLayout.LayoutParams waitLp = new LinearLayout.LayoutParams(0, dp(this, 68), 1);
+        waitLp.setMarginStart(dp(this, 8));
+        overview.addView(metricCard("TO REVIEW", String.valueOf(Waiting.all(this).size())), waitLp);
+        list.addView(overview, full());
+
         if (!ready || setup.next() >= 0 && setup.next() < 3) {
             LinearLayout warn = row(this);
             warn.setPaddingRelative(dp(this, 16), dp(this, 14), dp(this, 12), dp(this, 14));
@@ -264,6 +318,19 @@ public class MainActivity extends Screen implements ChatHub.Listener, Account.Li
             empty.addView(es);
             list.addView(empty, full());
         }
+    }
+
+
+    private View metricCard(String label, String value) {
+        LinearLayout card = column(this);
+        card.setGravity(Gravity.CENTER_VERTICAL);
+        card.setPaddingRelative(dp(this, 11), dp(this, 8), dp(this, 8), dp(this, 8));
+        card.setBackground(outlined(this, CARD, 14, LINE, 1));
+        card.addView(monoText(this, label, 9, MUTED));
+        TextView number = title(this, value, 20);
+        number.setPaddingRelative(0, dp(this, 2), 0, 0);
+        card.addView(number);
+        return card;
     }
 
     /** A row on a rounded card with side margins (the list's basic unit). */

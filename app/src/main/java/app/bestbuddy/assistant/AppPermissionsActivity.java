@@ -85,6 +85,21 @@ public class AppPermissionsActivity extends Screen {
         body.removeAllViews();
         body.addView(text(this, getString(R.string.perms_modes_intro), 13, MUTED), full());
 
+        body.addView(label(getString(R.string.autopilot_title)), gap(18));
+        body.addView(switchRow(this, getString(R.string.autopilot_approval_title),
+                getString(R.string.autopilot_approval_text), Prefs.autoRoutine(this), on -> {
+                    Prefs.setAutoRoutine(this, on);
+                    Toast.makeText(this, on ? getString(R.string.autopilot_enabled) : getString(R.string.autopilot_disabled),
+                            Toast.LENGTH_SHORT).show();
+                }), gap(8));
+        body.addView(switchRow(this, getString(R.string.autopilot_tap_title),
+                getString(R.string.autopilot_tap_text), Prefs.autoTap(this), on -> {
+                    Prefs.setAutoTap(this, on);
+                    Toast.makeText(this, on ? getString(R.string.autopilot_enabled) : getString(R.string.autopilot_disabled),
+                            Toast.LENGTH_SHORT).show();
+                }), gap(8));
+        body.addView(text(this, getString(R.string.autopilot_limits), 12, MUTED), gap(6));
+
         body.addView(label(getString(R.string.perms_smart_reviewer)), gap(18));
         // a reviewer that isn't signed in is greyed out
         java.util.Set<String> noReviewer = new java.util.HashSet<>();

@@ -37,6 +37,7 @@ final class Tools {
     private static final int MAX_NODES = 350;
     /** Screenshots are scaled so their shorter side is at most this, the same in portrait and landscape. */
     private static final int SCREENSHOT_SHORT_SIDE = 720;
+    private static final int SCREENSHOT_HIGH_SHORT_SIDE = 1080;
 
     private final BestBuddyService svc;
     private final Object lock = new Object();
@@ -61,23 +62,26 @@ final class Tools {
                         + "a tap there would land on something else. A toast that just showed is listed at the end.",
                 props()));
         t.put(tool("tap",
-                "Tap an element (by id from the last read_screen) or a screen coordinate in pixels. The result says NOTHING CHANGED "
+                "Tap an element by a fresh read_screen id, its visible text/content description, or a screen coordinate from a screenshot. The result says NOTHING CHANGED "
                         + "when the screen reads the same afterwards, and an element under another window isn't tapped.",
                 props().put("element", intProp("Element id from read_screen"))
+                        .put("text", strProp("Visible text or content description to tap when no fresh element id is available"))
                         .put("x", intProp("X in screen pixels")).put("y", intProp("Y in screen pixels"))));
         t.put(tool("long_press",
-                "Press and hold an element (by id from the last read_screen) or a screen coordinate in pixels, for "
+                "Press and hold an element by a fresh read_screen id, its visible text/content description, or a screen coordinate, for "
                         + "about 0.7 s. Use it for what apps put behind a long press: a message's or item's menu (reply, "
                         + "copy, delete, react), selecting items or text, moving icons. Use tap for normal taps. Returns "
                         + "\"Long-pressed\" and where; call read_screen to see the menu or selection it opened.",
-                props().put("element", intProp("Element id from read_screen (give this, or x and y)"))
+                props().put("element", intProp("Element id from read_screen (give this, text, or x and y)"))
+                        .put("text", strProp("Visible text or content description of the item to long-press"))
                         .put("x", intProp("X in screen pixels, when there's no element id"))
                         .put("y", intProp("Y in screen pixels, when there's no element id"))));
         t.put(tool("type_text",
-                "Type into the focused text field (or the given element). Replaces its content unless append is true. "
+                "Type into the focused text field or a field identified by element id or visible target label/hint. Replaces its content unless append is true. "
                         + "Set submit to press the keyboard's enter/send action afterwards.",
                 props().put("text", strProp("Text to type"))
                         .put("element", intProp("Optional element id of the text field"))
+                        .put("target", strProp("Optional visible text or hint of the target field; use when it is not already focused"))
                         .put("append", boolProp("Append instead of replacing"))
                         .put("submit", boolProp("Press the IME enter/send action after typing")),
                 "text"));
@@ -120,9 +124,9 @@ final class Tools {
                         + "\"Opened\"; call read_screen to see it.",
                 props().put("url", strProp("The URL or deep link, e.g. https://example.com or tel:+491234")), "url"));
         t.put(tool("screenshot",
-                "Take a screenshot (JPEG). Use only when read_screen is not enough (images, games, canvas UIs). "
+                "Take a screenshot (JPEG). Use detail=high for small controls or fine visual content; standard is lighter. Use when read_screen is not enough (images, games, canvas UIs). "
                         + "The reply says how to convert image coordinates to screen pixels.",
-                props()));
+                props().put("detail", enumProp("standard", "high"))));
         t.put(tool("wait", "Wait for the UI to settle, up to 10000 ms. To wait for something to happen, wait_for is "
                         + "quicker and surer.",
                 props().put("ms", intProp("Milliseconds")), "ms"));
@@ -139,7 +143,7 @@ final class Tools {
                 until.getJSONObject("properties")));
         t.put(tool("do_steps",
                 "Do several phone actions in one call, when you already know them (fill in a form: tap a field, type, "
-                        + "tap the next one…). Each step is {\"action\": tap | long_press | type | scroll | press | "
+                        + "tap the next one…). Each step is {\"action\": tap | long_press | type | scroll | swipe | press | "
                         + "open_app | wait, and its arguments as in that tool}; a step can name its target by \"text\" "
                         + "(its visible text or description) instead of an element id, which is surer once the screen has "
                         + "changed. Optional \"until\" on a step waits for something after it (as in wait_for). The same "
@@ -148,12 +152,15 @@ final class Tools {
                         + "step did; call read_screen after.",
                 props().put("steps", new JSONObject().put("type", "array").put("minItems", 1).put("maxItems", 12)
                         .put("items", new JSONObject().put("type", "object").put("properties", props()
-                                .put("action", enumProp("tap", "long_press", "type", "scroll", "press", "open_app", "wait"))
+                                .put("action", enumProp("tap", "long_press", "type", "scroll", "swipe", "press", "open_app", "wait"))
                                 .put("element", intProp("Element id from the last read_screen"))
                                 .put("text", strProp("tap/long_press: the target's visible text; type: the text to type"))
                                 .put("target", strProp("type: the field's visible text or hint, instead of element"))
                                 .put("x", intProp("X in screen pixels")).put("y", intProp("Y in screen pixels"))
                                 .put("direction", enumProp("up", "down", "left", "right"))
+                                .put("x1", intProp("swipe: start X")).put("y1", intProp("swipe: start Y"))
+                                .put("x2", intProp("swipe: end X")).put("y2", intProp("swipe: end Y"))
+                                .put("duration_ms", intProp("swipe: duration in milliseconds"))
                                 .put("button", enumProp("back", "home", "recents", "notifications", "quick_settings"))
                                 .put("app", strProp("open_app: the app")).put("ms", intProp("wait: milliseconds"))
                                 .put("append", boolProp("type: append")).put("submit", boolProp("type: press enter/send after"))
@@ -330,7 +337,26 @@ final class Tools {
             "find", "take_photo", "set_alarm", "set_timer", "share", "save_to_downloads", "add_calendar_event", "media"));
 
     JSONObject call(String name, JSONObject a) throws Exception {
-        JSONObject r = call0(name, a);
+        JSONObject r;
+        int attempt = 0;
+        while (true) {
+            try {
+                r = call0(name, a);
+                break;
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                return text("CANCELLED: the operation was interrupted. Do not repeat an action that may already have reached the phone.");
+            } catch (Exception e) {
+                if (attempt < 2 && retryableRead(name, e)) {
+                    attempt++;
+                    Thread.sleep(attempt * 500L);
+                    continue;
+                }
+                return text("ERROR [" + errorKind(e) + "]: " + safeError(e) + "\nRecovery: "
+                        + recoveryHint(name, e)
+                        + "\nThe failed operation was not automatically replayed because repeating it could duplicate an action.");
+            }
+        }
         if (STEPPED.contains(name)) {
             JSONArray content = r.optJSONArray("content");
             JSONObject first = content == null ? null : content.optJSONObject(0);
@@ -344,6 +370,57 @@ final class Tools {
                             + "BestBuddy, not from the screen. Take it into account now, it may change or stop the task:\n" + notes));
         }
         return r;
+    }
+
+    /** Only repeat read-only observations. Never replay taps, typing, sends, installs, payments or other mutations. */
+    private static boolean retryableRead(String name, Exception e) {
+        if (!("read_screen".equals(name) || "screenshot".equals(name) || "list_apps".equals(name))) return false;
+        String m = String.valueOf(e.getMessage()).toLowerCase(Locale.ROOT);
+        return e instanceof java.io.IOException || e instanceof java.net.SocketTimeoutException
+                || m.contains("timed out") || m.contains("rate-limited") || m.contains("temporarily unavailable")
+                || m.contains("try again") || m.contains("busy");
+    }
+
+    private static String safeError(Exception e) {
+        String m = e.getMessage();
+        if (m == null || m.trim().isEmpty()) m = e.getClass().getSimpleName();
+        return m.length() > 500 ? m.substring(0, 500) : m;
+    }
+
+    private static String errorKind(Exception e) {
+        String m = safeError(e).toLowerCase(Locale.ROOT);
+        if (m.contains("permission") || m.contains("accessibility") || m.contains("not connected"))
+            return "PERMISSION_OR_SERVICE";
+        if (m.contains("screenshot") || m.contains("screen")) return "SCREEN_CAPTURE";
+        if (m.contains("element") || m.contains("target") || m.contains("argument") || e instanceof IllegalArgumentException)
+            return "STALE_TARGET_OR_INPUT";
+        if (e instanceof java.io.IOException || e instanceof java.net.SocketTimeoutException || m.contains("network"))
+            return "NETWORK_OR_IO";
+        if (m.contains("timeout") || m.contains("timed out")) return "TIMEOUT";
+        return "TOOL_FAILURE";
+    }
+
+    private static String recoveryHint(String name, Exception e) {
+        String m = safeError(e).toLowerCase(Locale.ROOT);
+        if (m.contains("permission") || m.contains("accessibility") || m.contains("not connected"))
+            return "Check that BestBuddy's Accessibility Service is enabled and still connected in Android Settings. "
+                    + "If Android disabled it, ask the user to enable it; do not try to bypass the system permission.";
+        if (m.contains("screenshot") || m.contains("screen capture"))
+            return "Wait briefly, then take one fresh standard screenshot. If Android reports a secure/protected window "
+                    + "or capture is denied, use read_screen where possible or ask the user to perform that step.";
+        if (m.contains("element") || m.contains("target") || m.contains("stale"))
+            return "Call read_screen again, locate the current target, and use its fresh element id or exact visible label. "
+                    + "Do not reuse old coordinates or ids.";
+        if (e instanceof java.io.IOException || e instanceof java.net.SocketTimeoutException || m.contains("network"))
+            return "Check the provider connection and retry an idempotent read. For model requests, use the configured "
+                    + "free-provider fallback; never replay a write or send request without checking whether it succeeded.";
+        if (m.contains("context") || m.contains("token") || m.contains("length"))
+            return "Reduce the conversation context or switch to another verified free model with enough context capacity.";
+        if ("do_steps".equals(name))
+            return "The sequence stopped at the first failed step. Call read_screen, verify what actually happened, then "
+                    + "continue only from the first unfinished step.";
+        return "Inspect the current screen and tool state, correct the specific input or missing permission, and retry only "
+                + "after verifying that the previous action did not already take effect.";
     }
 
     private JSONObject call0(String name, JSONObject a) throws Exception {
@@ -398,7 +475,7 @@ final class Tools {
                 }
                 return text(openUrl(a.getString("url")));
             }
-            case "screenshot": return screenshot();
+            case "screenshot": return screenshot(a);
             case "wait_for": return text(waitFor(a));
             case "do_steps": return text(doSteps(a.getJSONArray("steps")));
             case "collect": return text(collect(a));
@@ -415,6 +492,510 @@ final class Tools {
                             + "your own there without calling confirm. Apps on Hard or Smart still ask the user.");
                 }
                 String summary = a.getString("summary");
+                if (!ruleRun() && Prefs.autoRoutine(svc) && Guard.allowable(svc, svc.foregroundPkg())
+                        package app.bestbuddy.assistant;
+
+import android.accessibilityservice.AccessibilityService;
+import android.accessibilityservice.GestureDescription;
+import android.content.ClipData;
+import android.content.ClipboardManager;
+import android.content.Intent;
+import android.content.pm.PackageManager;
+import android.content.pm.ResolveInfo;
+import android.graphics.Bitmap;
+import android.graphics.Path;
+import android.graphics.Rect;
+import android.net.Uri;
+import android.os.Bundle;
+import android.util.Base64;
+import android.util.DisplayMetrics;
+import android.view.Display;
+import android.view.ViewConfiguration;
+import android.view.accessibility.AccessibilityNodeInfo;
+import android.view.accessibility.AccessibilityWindowInfo;
+
+import org.json.JSONArray;
+import org.json.JSONException;
+import org.json.JSONObject;
+
+import java.io.ByteArrayOutputStream;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.Locale;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
+
+/** The phone-control tools exposed to the agents (Claude Code, Codex, OpenCode, Antigravity, Grok) over MCP. */
+final class Tools {
+    private static final int MAX_NODES = 350;
+    /** Screenshots are scaled so their shorter side is at most this, the same in portrait and landscape. */
+    private static final int SCREENSHOT_SHORT_SIDE = 720;
+    private static final int SCREENSHOT_HIGH_SHORT_SIDE = 1080;
+
+    private final BestBuddyService svc;
+    private final Object lock = new Object();
+    private final List<AccessibilityNodeInfo> lastNodes = new ArrayList<>();
+    private final BrowserTools browser;
+    private final PhoneTools phone;
+
+    Tools(BestBuddyService svc) {
+        this.svc = svc;
+        browser = new BrowserTools(svc);
+        phone = new PhoneTools(svc);
+    }
+
+    // ---------------------------------------------------------------- schema
+
+    JSONArray list() throws JSONException {
+        JSONArray t = new JSONArray();
+        t.put(tool("read_screen",
+                "Read what is on the phone screen as a list of UI elements with ids, text, and tap coordinates. "
+                        + "Call this first and after every action to see the result. Element ids are only valid until the next read_screen. "
+                        + "Elements can also show a field's error, its hint, a heading, a tooltip or a pane title; \"(covered by ...)\" means "
+                        + "a tap there would land on something else. A toast that just showed is listed at the end.",
+                props()));
+        t.put(tool("tap",
+                "Tap an element by a fresh read_screen id, its visible text/content description, or a screen coordinate from a screenshot. The result says NOTHING CHANGED "
+                        + "when the screen reads the same afterwards, and an element under another window isn't tapped.",
+                props().put("element", intProp("Element id from read_screen"))
+                        .put("text", strProp("Visible text or content description to tap when no fresh element id is available"))
+                        .put("x", intProp("X in screen pixels")).put("y", intProp("Y in screen pixels"))));
+        t.put(tool("long_press",
+                "Press and hold an element by a fresh read_screen id, its visible text/content description, or a screen coordinate, for "
+                        + "about 0.7 s. Use it for what apps put behind a long press: a message's or item's menu (reply, "
+                        + "copy, delete, react), selecting items or text, moving icons. Use tap for normal taps. Returns "
+                        + "\"Long-pressed\" and where; call read_screen to see the menu or selection it opened.",
+                props().put("element", intProp("Element id from read_screen (give this, text, or x and y)"))
+                        .put("text", strProp("Visible text or content description of the item to long-press"))
+                        .put("x", intProp("X in screen pixels, when there's no element id"))
+                        .put("y", intProp("Y in screen pixels, when there's no element id"))));
+        t.put(tool("type_text",
+                "Type into the focused text field or a field identified by element id or visible target label/hint. Replaces its content unless append is true. "
+                        + "Set submit to press the keyboard's enter/send action afterwards.",
+                props().put("text", strProp("Text to type"))
+                        .put("element", intProp("Optional element id of the text field"))
+                        .put("target", strProp("Optional visible text or hint of the target field; use when it is not already focused"))
+                        .put("append", boolProp("Append instead of replacing"))
+                        .put("submit", boolProp("Press the IME enter/send action after typing")),
+                "text"));
+        t.put(tool("scroll",
+                "Scroll a list or page by about a third of its height or width, to reach content that isn't on "
+                        + "screen yet: 'down' shows what's further down (like reading on), 'up' goes back, 'left'/'right' "
+                        + "for carousels and tabs. Without element it scrolls the middle of the screen; give the id of a "
+                        + "scrollable element (marked scroll in read_screen) to scroll just that list. Returns "
+                        + "\"Scrolled\"; call read_screen to see what came into view. For a precise drag, use swipe.",
+                props().put("direction", enumProp("up", "down", "left", "right"))
+                        .put("element", intProp("Optional: id of the scrollable element from read_screen")),
+                "direction"));
+        t.put(tool("swipe",
+                "Drag a finger in a straight line from (x1, y1) to (x2, y2), in screen pixels. Use it for gestures "
+                        + "scroll doesn't cover: moving a slider, swiping a card or a message aside, pulling down to "
+                        + "refresh, dragging on a map. A very short swipe counts as a tap. Returns \"Swiped\"; call "
+                        + "read_screen to see the result.",
+                props().put("x1", intProp("Start X in screen pixels")).put("y1", intProp("Start Y in screen pixels"))
+                        .put("x2", intProp("End X in screen pixels")).put("y2", intProp("End Y in screen pixels"))
+                        .put("duration_ms", intProp("How long the drag takes, 50 to 3000 ms (default 300); slower is "
+                                + "more like dragging, faster like flinging")),
+                "x1", "y1", "x2", "y2"));
+        t.put(tool("press",
+                "Press one of Android's system buttons: back (leave the current screen or close a dialog or the "
+                        + "keyboard), home (go to the home screen), recents (the recent apps list), notifications (pull "
+                        + "down the notification shade), quick_settings (open Quick Settings). To switch apps, open_app "
+                        + "is faster than home and recents. Returns \"Pressed\" or \"Could not press\".",
+                props().put("button", enumProp("back", "home", "recents", "notifications", "quick_settings")),
+                "button"));
+        t.put(tool("open_app",
+                "Open an installed app by its name (e.g. 'Messenger') or package name.",
+                props().put("app", strProp("App name or package")), "app"));
+        t.put(tool("list_apps", "List launchable apps with their package names.", props()));
+        t.put(tool("open_url",
+                "Open a link on the phone the way tapping it would: https:// pages open in the user's browser or "
+                        + "in the app that handles them (a YouTube link in YouTube), and deep links open their app "
+                        + "(mailto: an email draft, tel: the dialer with the number, geo: or a maps link a map, "
+                        + "market:// the Play Store). Nothing is sent or called by opening a link. For public web pages "
+                        + "you only need to read, the browser_* tools work without taking over the screen. Returns "
+                        + "\"Opened\"; call read_screen to see it.",
+                props().put("url", strProp("The URL or deep link, e.g. https://example.com or tel:+491234")), "url"));
+        t.put(tool("screenshot",
+                "Take a screenshot (JPEG). Use detail=high for small controls or fine visual content; standard is lighter. Use when read_screen is not enough (images, games, canvas UIs). "
+                        + "The reply says how to convert image coordinates to screen pixels.",
+                props().put("detail", enumProp("standard", "high"))));
+        t.put(tool("wait", "Wait for the UI to settle, up to 10000 ms. To wait for something to happen, wait_for is "
+                        + "quicker and surer.",
+                props().put("ms", intProp("Milliseconds")), "ms"));
+        JSONObject until = new JSONObject().put("type", "object").put("description", "Wait after the step for: text to "
+                + "appear, gone text to go, app to be in front, or settled (the screen stops changing); up to timeout_ms.")
+                .put("properties", props().put("text", strProp("Text that should appear")).put("gone", strProp("Text that should go"))
+                        .put("app", strProp("App name or package that should be in front"))
+                        .put("settled", boolProp("Until the screen stops changing"))
+                        .put("timeout_ms", intProp("Default 8000, max 30000")));
+        t.put(tool("wait_for",
+                "Wait until something happens on the screen, instead of guessing a delay: text appears (a page loaded, "
+                        + "a message arrived), text goes (a spinner, \"Sending…\"), an app comes to the front, or the "
+                        + "screen settles. Returns OK with how long it took, or TIMED OUT.",
+                until.getJSONObject("properties")));
+        t.put(tool("do_steps",
+                "Do several phone actions in one call, when you already know them (fill in a form: tap a field, type, "
+                        + "tap the next one…). Each step is {\"action\": tap | long_press | type | scroll | swipe | press | "
+                        + "open_app | wait, and its arguments as in that tool}; a step can name its target by \"text\" "
+                        + "(its visible text or description) instead of an element id, which is surer once the screen has "
+                        + "changed. Optional \"until\" on a step waits for something after it (as in wait_for). The same "
+                        + "approvals apply to every step. The batch stops at the first step that fails or is blocked, "
+                        + "when an approval card comes up, or when another app comes to the front. Returns what each "
+                        + "step did; call read_screen after.",
+                props().put("steps", new JSONObject().put("type", "array").put("minItems", 1).put("maxItems", 12)
+                        .put("items", new JSONObject().put("type", "object").put("properties", props()
+                                .put("action", enumProp("tap", "long_press", "type", "scroll", "swipe", "press", "open_app", "wait"))
+                                .put("element", intProp("Element id from the last read_screen"))
+                                .put("text", strProp("tap/long_press: the target's visible text; type: the text to type"))
+                                .put("target", strProp("type: the field's visible text or hint, instead of element"))
+                                .put("x", intProp("X in screen pixels")).put("y", intProp("Y in screen pixels"))
+                                .put("direction", enumProp("up", "down", "left", "right"))
+                                .put("x1", intProp("swipe: start X")).put("y1", intProp("swipe: start Y"))
+                                .put("x2", intProp("swipe: end X")).put("y2", intProp("swipe: end Y"))
+                                .put("duration_ms", intProp("swipe: duration in milliseconds"))
+                                .put("button", enumProp("back", "home", "recents", "notifications", "quick_settings"))
+                                .put("app", strProp("open_app: the app")).put("ms", intProp("wait: milliseconds"))
+                                .put("append", boolProp("type: append")).put("submit", boolProp("type: press enter/send after"))
+                                .put("until", until)).put("required", new JSONArray().put("action")))),
+                "steps"));
+        t.put(tool("collect",
+                "Read a long list or conversation in one call: scrolls it and gathers the text that comes into view, "
+                        + "without repeats, until nothing new appears (or max_scrolls). Use it to summarize a chat, "
+                        + "a feed or search results. 'up' for older messages in a chat, 'down' for further down a list.",
+                props().put("direction", enumProp("up", "down"))
+                        .put("element", intProp("Optional: id of the scrollable element from read_screen"))
+                        .put("max_scrolls", intProp("Default 8, max 25")),
+                "direction"));
+        t.put(tool("find",
+                "Scroll until some text is on the screen (a contact, a setting, a message), then stop. Returns FOUND "
+                        + "with where it is, or NOT FOUND; call read_screen to act on it.",
+                props().put("text", strProp("The text to look for (case doesn't matter)"))
+                        .put("direction", enumProp("up", "down"))
+                        .put("element", intProp("Optional: id of the scrollable element from read_screen"))
+                        .put("max_scrolls", intProp("Default 10, max 30")),
+                "text"));
+        t.put(tool("confirm",
+                "Ask the user to approve an action in the BestBuddy bubble and wait for the answer. "
+                        + "REQUIRED before sending messages, posting, buying, deleting, or changing settings. "
+                        + "Show the exact text or action. Returns APPROVED, DENIED, or CHANGES REQUESTED with "
+                        + "what the user wants changed: then make those changes and call confirm again.",
+                props().put("summary", strProp("Exactly what you are about to do, including any text to be sent")),
+                "summary"));
+        t.put(tool("ask",
+                "Ask the user a question in the BestBuddy bubble and wait for the answer: 2 to 4 answer buttons, and "
+                        + "the user can always type their own answer instead. Use it when you need the user to choose "
+                        + "or decide (which reply, which item, which time) instead of guessing. With highlight, it also "
+                        + "hands a step over to the user (a password or code, their details in a form, a file picker, a "
+                        + "captcha): e.g. \"Type your password, then tap Done\" with options [\"Done\", \"I can't\"] and the "
+                        + "field in highlight. Returns ANSWER with the option picked, ANSWER (typed) with the user's own "
+                        + "words, or NO ANSWER. It is not an approval: still call confirm before anything outward-facing.",
+                props().put("question", strProp("The question, short and clear"))
+                        .put("options", new JSONObject().put("type", "array").put("minItems", 2).put("maxItems", 4)
+                                .put("items", new JSONObject().put("type", "string"))
+                                .put("description", "2 to 4 short answers, one per button"))
+                        .put("highlight", marksProp("Optional: what the user has to do on the screen before answering "
+                                + "(as in point_out), e.g. the fields to fill in. BestBuddy marks them, and the question waits "
+                                + "next to the bubble instead of covering the screen; the marks go once they answer. When "
+                                + "every mark is a button or a switch, BestBuddy closes the question itself once it sees "
+                                + "them done (the result starts with DONE).")),
+                "question", "options"));
+        JSONObject item = new JSONObject().put("type", "object").put("properties", props()
+                .put("ref", intProp("The item's number from browser_read"))
+                .put("label", strProp("A few words shown next to it, e.g. \"Your password\"")));
+        t.getJSONObject(t.length() - 1).getJSONObject("inputSchema").getJSONObject("properties").put("browser_highlight",
+                new JSONObject().put("type", "array").put("maxItems", 6).put("items", item).put("description",
+                        "Optional, instead of highlight: items in the background browser the user has to use (a "
+                                + "sign-in, a captcha, their details). BestBuddy opens the browser full screen with them "
+                                + "marked, and closes it once the user answers."));
+        t.put(tool("point_out",
+                "Show the user where to look or what to do on the screen: a box, circle or arrow with a short label "
+                        + "around up to 6 elements, drawn over the app without blocking their touches. When the user does "
+                        + "what a mark points at (taps that button, flips that switch, fills in that field and moves on), "
+                        + "it turns green and goes. With wait=true the call returns only then (DONE: what they did) or "
+                        + "when they don't (GONE, LEFT, NOT DONE): use it to guide the user step by step through "
+                        + "something they want to learn to do themselves, one step per call, instead of doing it for "
+                        + "them. Marks follow their element as the screen scrolls, and go when it's gone, when the app "
+                        + "changes, when you use another phone action, or after seconds. Call with no marks to remove them.",
+                props().put("marks", marksProp("What to point out, e.g. [{\"element\": 12, \"label\": \"First name\"}, "
+                                + "{\"element\": 14, \"label\": \"Last name\"}]"))
+                        .put("style", enumProp("box", "circle", "arrow"))
+                        .put("wait", boolProp("Wait until the user has done what the marks point at, or until they can't anymore"))
+                        .put("seconds", intProp("How long the marks stay at most: default 60 (180 with wait), max 300")),
+                "marks"));
+        t.put(tool("notify", "Show a short status line in the BestBuddy bubble without stopping.",
+                props().put("text", strProp("Status text")), "text"));
+        t.put(tool("reply_notification",
+                "Answer the notification that started this chat through its own reply field, without opening the app. "
+                        + "Only in chats started by one of the user's notification rules, when the notification has a reply "
+                        + "field. BestBuddy shows the user an approval card with the text first, unless you called confirm "
+                        + "with it just before.",
+                props().put("text", strProp("The reply, exactly as it should be sent")), "text"));
+        t.put(tool("schedule_message",
+                "Schedule a message to yourself in this chat, sent once at a later time: to check something again, "
+                        + "remind the user, or go on with a task later (\"check the price again tomorrow at 9\"). At its time "
+                        + "BestBuddy sends it into this chat as a new message to you, also with the phone locked, and you work "
+                        + "as usual. The user sees it above the chat and can cancel it. For something every day, tell "
+                        + "the user about Chat options > Schedule instead.",
+                props().put("message", strProp("What to do then, as a message to yourself with everything you'll need"))
+                        .put("in_minutes", intProp("In this many minutes"))
+                        .put("at", strProp("Or at this time, the phone's: \"2026-10-28 09:00\", or \"09:00\" for the next one"))
+                        .put("remind", boolProp("A plain reminder for the user (\"remind me at 6 to call mom\"): at that "
+                                + "time BestBuddy shows the message to them as a notification and in this chat, without "
+                                + "running you, so it uses none of their plan. The message is then for the user."))
+                        .put("quiet", boolProp("For a check you'll run then (\"tell me if the price drops\"): you may "
+                                + "end that run without notifying the user when there's no news")),
+                "message"));
+        t.put(tool("list_scheduled", "List the messages scheduled in this chat with schedule_message.", props()));
+        t.put(tool("cancel_scheduled", "Cancel a message scheduled with schedule_message.",
+                props().put("id", strProp("Its id, from schedule_message or list_scheduled")), "id"));
+        t.put(tool("install_apk",
+                "(Needs Linux tools) Open Android's installer for an APK built in BestBuddy's Linux, e.g. "
+                        + "/root/.buddy/work/myapp/build/app.apk, or served by another app on this phone at a local URL "
+                        + "(http://127.0.0.1:<port>/app.apk, e.g. from Termux). The user taps Install/Update themselves; "
+                        + "call wait_for_install next.",
+                props().put("path", strProp("Full path of the .apk inside BestBuddy's Linux, or its http://127.0.0.1 URL")), "path"));
+        if (Flavor.FDROID) { // F-Droid updates this build; the tool says where updates come from
+            t.put(tool("update_buddy",
+                    "Say how this BestBuddy gets its updates (it's the F-Droid build, which doesn't update itself). Use it when "
+                            + "the user asks to update BestBuddy or whether there's a new version.", props()));
+        } else {
+            t.put(tool("update_buddy",
+                    "Check whether a newer BestBuddy is out (the official GitHub release) and what's new; with install=true, "
+                            + "download it and open Android's installer. Use it when the user asks to update BestBuddy or whether "
+                            + "there's a new version. Only the user can tap Update.",
+                    props().put("install", boolProp("true: download the update and open the installer (after the user said yes)"))));
+        }
+        t.put(tool("wait_for_install",
+                "After opening the Android installer for an APK, wait until the user has tapped Install/Update and confirmed. "
+                        + "Returns as soon as the package is installed (at least min_version_code if given), or early if the "
+                        + "installer is no longer on screen, or after the timeout. Use this instead of shell polling loops.",
+                props().put("package", strProp("Package name, e.g. com.buddyapps.flappy"))
+                        .put("min_version_code", intProp("Wait for at least this versionCode (for updates)"))
+                        .put("timeout_s", intProp("Default 120, max 300")),
+                "package"));
+        PhoneTools.list(t); // the clipboard, alarms, sharing, Downloads, status, camera, location
+        if (Browser.available(svc)) BrowserTools.list(t); // the background browser (Settings)
+        return t;
+    }
+
+    static JSONObject tool(String name, String desc, JSONObject properties, String... required) throws JSONException {
+        JSONObject schema = new JSONObject().put("type", "object").put("properties", properties);
+        if (required.length > 0) {
+            JSONArray r = new JSONArray();
+            for (String s : required) r.put(s);
+            schema.put("required", r);
+        }
+        return new JSONObject().put("name", name).put("description", desc).put("inputSchema", schema);
+    }
+
+    static JSONObject props() {
+        return new JSONObject();
+    }
+
+    static JSONObject intProp(String d) throws JSONException {
+        return new JSONObject().put("type", "integer").put("description", d);
+    }
+
+    static JSONObject strProp(String d) throws JSONException {
+        return new JSONObject().put("type", "string").put("description", d);
+    }
+
+    static JSONObject boolProp(String d) throws JSONException {
+        return new JSONObject().put("type", "boolean").put("description", d);
+    }
+
+    static JSONObject enumProp(String... values) throws JSONException {
+        JSONArray a = new JSONArray();
+        for (String v : values) a.put(v);
+        return new JSONObject().put("type", "string").put("enum", a);
+    }
+
+    /** Marks for point_out and ask's highlight: elements from read_screen, or points on the screen. */
+    private static JSONObject marksProp(String d) throws JSONException {
+        JSONObject mark = new JSONObject().put("type", "object").put("properties", props()
+                .put("element", intProp("Element id from the last read_screen"))
+                .put("x", intProp("Or a point in screen pixels, when read_screen can't see it (from screenshot)"))
+                .put("y", intProp("With x"))
+                .put("label", strProp("A few words shown next to it, e.g. \"Your first name\"")));
+        return new JSONObject().put("type", "array").put("maxItems", 6).put("items", mark).put("description", d);
+    }
+
+    // ------------------------------------------------------------ dispatch
+
+    /** A tool call, plus anything the user added while the agent works (see ChatHub.takeNotes). */
+    /** The actions "View steps" keeps (see StepLog). */
+    private static final java.util.Set<String> STEPPED = new java.util.HashSet<>(java.util.Arrays.asList(
+            "tap", "long_press", "type_text", "scroll", "swipe", "press", "open_app", "open_url", "do_steps", "collect",
+            "find", "take_photo", "set_alarm", "set_timer", "share", "save_to_downloads", "add_calendar_event", "media"));
+
+    JSONObject call(String name, JSONObject a) throws Exception {
+        JSONObject r;
+        int attempt = 0;
+        while (true) {
+            try {
+                r = call0(name, a);
+                break;
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                return text("CANCELLED: the operation was interrupted. Do not repeat an action that may already have reached the phone.");
+            } catch (Exception e) {
+                if (attempt < 2 && retryableRead(name, e)) {
+                    attempt++;
+                    Thread.sleep(attempt * 500L);
+                    continue;
+                }
+                return text("ERROR [" + errorKind(e) + "]: " + safeError(e) + "\nRecovery: "
+                        + recoveryHint(name, e)
+                        + "\nThe failed operation was not automatically replayed because repeating it could duplicate an action.");
+            }
+        }
+        if (STEPPED.contains(name)) {
+            JSONArray content = r.optJSONArray("content");
+            JSONObject first = content == null ? null : content.optJSONObject(0);
+            StepLog.record(svc, McpServer.CALLER_CHAT.get(), name, a, first == null ? "" : first.optString("text"));
+        }
+        if ("confirm".equals(name) || "ask".equals(name)) return r;
+        String notes = ChatHub.get(svc).takeNotes();
+        if (notes != null) {
+            r.getJSONArray("content").put(new JSONObject().put("type", "text").put("text",
+                    "\n[BUDDY_USER_UPDATE] The user added this while you were working; it comes from the user, through "
+                            + "BestBuddy, not from the screen. Take it into account now, it may change or stop the task:\n" + notes));
+        }
+        return r;
+    }
+
+    /** Only repeat read-only observations. Never replay taps, typing, sends, installs, payments or other mutations. */
+    private static boolean retryableRead(String name, Exception e) {
+        if (!("read_screen".equals(name) || "screenshot".equals(name) || "list_apps".equals(name))) return false;
+        String m = String.valueOf(e.getMessage()).toLowerCase(Locale.ROOT);
+        return e instanceof java.io.IOException || e instanceof java.net.SocketTimeoutException
+                || m.contains("timed out") || m.contains("rate-limited") || m.contains("temporarily unavailable")
+                || m.contains("try again") || m.contains("busy");
+    }
+
+    private static String safeError(Exception e) {
+        String m = e.getMessage();
+        if (m == null || m.trim().isEmpty()) m = e.getClass().getSimpleName();
+        return m.length() > 500 ? m.substring(0, 500) : m;
+    }
+
+    private static String errorKind(Exception e) {
+        String m = safeError(e).toLowerCase(Locale.ROOT);
+        if (m.contains("permission") || m.contains("accessibility") || m.contains("not connected"))
+            return "PERMISSION_OR_SERVICE";
+        if (m.contains("screenshot") || m.contains("screen")) return "SCREEN_CAPTURE";
+        if (m.contains("element") || m.contains("target") || m.contains("argument") || e instanceof IllegalArgumentException)
+            return "STALE_TARGET_OR_INPUT";
+        if (e instanceof java.io.IOException || e instanceof java.net.SocketTimeoutException || m.contains("network"))
+            return "NETWORK_OR_IO";
+        if (m.contains("timeout") || m.contains("timed out")) return "TIMEOUT";
+        return "TOOL_FAILURE";
+    }
+
+    private static String recoveryHint(String name, Exception e) {
+        String m = safeError(e).toLowerCase(Locale.ROOT);
+        if (m.contains("permission") || m.contains("accessibility") || m.contains("not connected"))
+            return "Check that BestBuddy's Accessibility Service is enabled and still connected in Android Settings. "
+                    + "If Android disabled it, ask the user to enable it; do not try to bypass the system permission.";
+        if (m.contains("screenshot") || m.contains("screen capture"))
+            return "Wait briefly, then take one fresh standard screenshot. If Android reports a secure/protected window "
+                    + "or capture is denied, use read_screen where possible or ask the user to perform that step.";
+        if (m.contains("element") || m.contains("target") || m.contains("stale"))
+            return "Call read_screen again, locate the current target, and use its fresh element id or exact visible label. "
+                    + "Do not reuse old coordinates or ids.";
+        if (e instanceof java.io.IOException || e instanceof java.net.SocketTimeoutException || m.contains("network"))
+            return "Check the provider connection and retry an idempotent read. For model requests, use the configured "
+                    + "free-provider fallback; never replay a write or send request without checking whether it succeeded.";
+        if (m.contains("context") || m.contains("token") || m.contains("length"))
+            return "Reduce the conversation context or switch to another verified free model with enough context capacity.";
+        if ("do_steps".equals(name))
+            return "The sequence stopped at the first failed step. Call read_screen, verify what actually happened, then "
+                    + "continue only from the first unfinished step.";
+        return "Inspect the current screen and tool state, correct the specific input or missing permission, and retry only "
+                + "after verifying that the previous action did not already take effect.";
+    }
+
+    private JSONObject call0(String name, JSONObject a) throws Exception {
+        String revoked = svc.controlRevoked();
+        if (revoked != null && !"notify".equals(name)) return text(revoked);
+        String capped = countStep(name, a);
+        if (capped != null) return text(capped);
+        if (name.startsWith("browser_")) { // the background browser: it doesn't need the phone's screen
+            svc.onToolActivity(name);
+            return browser.call(name, a);
+        }
+        // locked or dark, the screen shows nothing to read or tap: say so instead of acting blind
+        if (SCREEN.contains(name) && Triggers.locked(svc)) {
+            // a scheduled task's run asks the user to unlock and waits a little for them (null: unlocked, go on)
+            String locked = Schedules.awaitUnlock(svc, McpServer.CALLER_CHAT.get(), name);
+            if (locked != null) return text(locked);
+        }
+        if (SCREEN.contains(name) && Triggers.locked(svc)) {
+            return text(Browser.available(svc) && !ruleRun()
+                    ? "Phone is locked: only notification replies and the background browser work until the user unlocks. "
+                    + "For web pages use the browser_* tools; for anything else, tell the user to unlock the phone."
+                    : "Phone is locked: only notification replies work until the user unlocks. Tell the user to unlock "
+                    + "the phone, or stop here.");
+        }
+        // asking the user, posting a note, pointing something out and answering in a notification go on while paused;
+        // operating the phone waits
+        if (!"confirm".equals(name) && !"ask".equals(name) && !"notify".equals(name) && !"reply_notification".equals(name)
+                && !"point_out".equals(name) && !SCHEDULING.contains(name)) {
+            String held = svc.awaitResume(name);
+            if (held != null) return text(held);
+        }
+        svc.onToolActivity(name);
+        String step = activity(name, a);
+        if (step != null) svc.showActivity(step, null);
+        if (ACTIONS.contains(name)) svc.runOnMain(() -> svc.marks().clear()); // the screen is about to change
+        if (PhoneTools.NAMES.contains(name)) return phone.call(name, a, ruleRun());
+        switch (name) {
+            case "read_screen": return text(readScreen());
+            case "tap": return text(tap(a, false));
+            case "long_press": return text(tap(a, true));
+            case "type_text": return text(typeText(a));
+            case "scroll": return text(scroll(a));
+            case "swipe": return text(swipe(a));
+            case "press": return text(press(a.getString("button")));
+            case "open_app": return text(openApp(a.getString("app")));
+            case "list_apps": return text(listApps());
+            case "open_url": {
+                // a rule's run works for someone else's message: a link could carry the user's data away
+                if (ruleRun() && !Guard.takeApproval(false, a.getString("url"))) {
+                    String answer = svc.askConfirm(svc.getString(R.string.tools_card_open_url, a.getString("url")), false);
+                    if (!answer.startsWith("APPROVED")) return text("Not opened. " + answer);
+                }
+                return text(openUrl(a.getString("url")));
+            }
+            case "screenshot": return screenshot(a);
+            case "wait_for": return text(waitFor(a));
+            case "do_steps": return text(doSteps(a.getJSONArray("steps")));
+            case "collect": return text(collect(a));
+            case "find": return text(find(a));
+            case "wait": {
+                long ms = Math.max(0, Math.min(10000, a.optLong("ms", 1000)));
+                Thread.sleep(ms);
+                return text("Waited " + ms + " ms.");
+            }
+            case "confirm": {
+                if (!ruleRun() && Guard.autonomous(svc, svc.foregroundPkg())) {
+                    // no card in an app the user trusts; not counted as approval for a tap in another app
+                    return text("APPROVED automatically: the user trusts " + svc.foregroundAppName() + ", so work on "
+                            + "your own there without calling confirm. Apps on Hard or Smart still ask the user.");
+                }
+                String summary = a.getString("summary");
+                if (!ruleRun() && Prefs.autoRoutine(svc) && Guard.allowable(svc, svc.foregroundPkg())
+                        && Guard.autoRoutineText(summary)) {
+                    Guard.approved(summary, true);
+                    noteInChat(McpServer.CALLER_CHAT.get(), "Auto-Pilot approved this routine step in "
+                            + svc.foregroundAppName() + ". Sensitive actions remain protected.");
+                    return text("APPROVED automatically by Auto-Pilot for this routine step in "
+                            + svc.foregroundAppName() + ". This approval covers only the described action; "
+                            + "payment, purchases, deletion, installation, passwords and security settings still require user approval.");
+                }
                 if (!ruleRun() && Guard.routineText(summary) && Guard.runRule(svc, svc.foregroundPkg())) {
                     // the user allowed this app until the run ends: as after a countdown, it covers sending, nothing more
                     Guard.approved(summary, true);
@@ -982,7 +1563,19 @@ final class Tools {
     }
 
     private AccessibilityNodeInfo node(JSONObject a) {
-        if (!a.has("element")) return null;
+        return node(a, false);
+    }
+
+    /** Resolve visible text only for touch actions; type_text.text is the content to enter, not a target label. */
+    private AccessibilityNodeInfo node(JSONObject a, boolean allowTextTarget) {
+        if (!a.has("element")) {
+            String label = a.optString("target", allowTextTarget ? a.optString("text", "") : "").trim();
+            if (label.isEmpty()) return null;
+            AccessibilityNodeInfo found = findText(label);
+            if (found == null) throw new IllegalArgumentException("No visible element matches \"" + label
+                    + "\". Call read_screen and use a fresh element id, or check the label.");
+            return found;
+        }
         int id = a.optInt("element", -1);
         synchronized (lock) {
             if (id < 0 || id >= lastNodes.size())
@@ -1131,6 +1724,11 @@ final class Tools {
                         a = new JSONObject().put("direction", st.optString("direction", "down"));
                         if (st.has("element")) a.put("element", st.getInt("element"));
                         break;
+                    case "swipe":
+                        a = new JSONObject().put("x1", st.getInt("x1")).put("y1", st.getInt("y1"))
+                                .put("x2", st.getInt("x2")).put("y2", st.getInt("y2"))
+                                .put("duration_ms", st.optLong("duration_ms", 300));
+                        break;
                     case "press":
                         a = new JSONObject().put("button", st.optString("button"));
                         break;
@@ -1166,6 +1764,7 @@ final class Tools {
                         break;
                     }
                     case "scroll": r = scroll(a); break;
+                    case "swipe": r = swipe(a); break;
                     case "press": r = press(a.getString("button")); break;
                     case "open_app": r = openApp(a.getString("app")); break;
                     default: {
@@ -1175,8 +1774,12 @@ final class Tools {
                     }
                 }
                 if (a.has("found")) r = "(\"" + a.getString("found") + "\") " + r;
-            } catch (IllegalArgumentException e) {
-                r = "FAILED: " + e.getMessage();
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                r = "FAILED: the sequence was interrupted; inspect the screen before continuing.";
+                stop = true;
+            } catch (Exception e) {
+                r = "FAILED [" + errorKind(e) + "]: " + safeError(e) + ". Recovery: " + recoveryHint(tool, e);
                 stop = true;
             }
             // a refusal, an answer from the user, or anything that didn't happen ends the batch
@@ -1294,7 +1897,7 @@ final class Tools {
     // ------------------------------------------------------------- actions
 
     private String tap(JSONObject a, boolean longPress) throws Exception {
-        AccessibilityNodeInfo n = node(a);
+        AccessibilityNodeInfo n = node(a, true);
         int x, y;
         if (n != null) {
             Rect r = new Rect();
@@ -1430,6 +2033,9 @@ final class Tools {
         String label = Guard.buttonLabel(target);
         String app = svc.foregroundAppName();
         boolean userAsks = Guard.listed(svc, "ask", label, pkg);
+        // Auto-Tap is limited to eligible apps and routine, non-password controls. Risky buttons still go through Guard.
+        if (Prefs.autoTap(svc) && !userAsks && Guard.allowable(svc, pkg)
+                && Guard.riskyLabel(target) == null && !target.isPassword()) return null;
         // auto-approve: as in an app the user trusts, but never for an app they listed as always asking
         if (!userAsks && Guard.autoApprove(svc, pkg)) return null;
         Guard.remember(svc, label, pkg, app);
@@ -1934,17 +2540,17 @@ final class Tools {
         return "Opened " + url + ". Call read_screen to see it.";
     }
 
-    private JSONObject screenshot() throws Exception {
+    private JSONObject screenshot(JSONObject args) throws Exception {
         try {
-            return screenshotOnce();
+            return screenshotOnce(args);
         } catch (IllegalStateException e) { // too soon after "View steps" took its own: once more, a second later
             if (!String.valueOf(e.getMessage()).startsWith("Screenshots are rate-limited")) throw e;
             Thread.sleep(1100);
-            return screenshotOnce();
+            return screenshotOnce(args);
         }
     }
 
-    private JSONObject screenshotOnce() throws Exception {
+    private JSONObject screenshotOnce(JSONObject args) throws Exception {
         svc.setBubblePassThrough(true);
         Thread.sleep(150);
         final CountDownLatch done = new CountDownLatch(1);
@@ -1977,15 +2583,17 @@ final class Tools {
         }
         Bitmap full = shot.get();
         if (full == null) throw new IllegalStateException(error.get() != null ? error.get() : "Screenshot timed out.");
-        float scale = Math.min(1f, (float) SCREENSHOT_SHORT_SIDE / Math.min(full.getWidth(), full.getHeight()));
+        boolean high = "high".equalsIgnoreCase(args.optString("detail", "standard"));
+        int targetSide = high ? SCREENSHOT_HIGH_SHORT_SIDE : SCREENSHOT_SHORT_SIDE;
+        float scale = Math.min(1f, (float) targetSide / Math.min(full.getWidth(), full.getHeight()));
         Bitmap small = scale < 1f
                 ? Bitmap.createScaledBitmap(full, Math.round(full.getWidth() * scale), Math.round(full.getHeight() * scale), true)
                 : full;
         ByteArrayOutputStream jpg = new ByteArrayOutputStream();
-        small.compress(Bitmap.CompressFormat.JPEG, 70, jpg);
+        small.compress(Bitmap.CompressFormat.JPEG, high ? 82 : 70, jpg);
         String note = String.format(Locale.ROOT,
-                "Screenshot %dx%d (screen is %dx%d). To tap something you see, multiply image coordinates by %.3f.",
-                small.getWidth(), small.getHeight(), full.getWidth(), full.getHeight(), 1f / scale);
+                "Screenshot %dx%d (screen is %dx%d, detail=%s). To tap something you see, multiply image coordinates by %.3f.",
+                small.getWidth(), small.getHeight(), full.getWidth(), full.getHeight(), high ? "high" : "standard", 1f / scale);
         return new JSONObject().put("content", new JSONArray()
                 .put(new JSONObject().put("type", "image").put("mimeType", "image/jpeg")
                         .put("data", Base64.encodeToString(jpg.toByteArray(), Base64.NO_WRAP)))

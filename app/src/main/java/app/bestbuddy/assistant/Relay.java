@@ -255,7 +255,10 @@ final class Relay {
             if (body.length > 0) model = new org.json.JSONObject(new String(body, StandardCharsets.UTF_8)).optString("model", "");
         } catch (Exception ignored) {}
         String route = parts.length == 3 ? parts[2].toLowerCase(Locale.ROOT) : "";
-        boolean modelRequest = route.contains("chat/completions") || route.endsWith("responses") || route.endsWith("messages");
+        // Provider inference APIs are POST-based. Guard every non-read request, not just the common chat routes:
+        // otherwise legacy /completions or other POST endpoints could use a provider-side paid default model.
+        boolean modelRequest = (!"GET".equalsIgnoreCase(method) && !"HEAD".equalsIgnoreCase(method))
+                || route.contains("chat/completions") || route.endsWith("responses") || route.endsWith("messages");
         if (modelRequest && model.isEmpty()) {
             error(out, 403, "BestBuddy requires an explicitly selected, verified free model for inference requests.");
             return;
