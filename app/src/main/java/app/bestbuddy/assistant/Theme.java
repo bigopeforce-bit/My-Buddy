@@ -16,7 +16,7 @@ final class Theme {
             {"#3D6FE0", "Ocean"}, {"#7C5CE0", "Violet"}, {"#12B886", "Mint"},
             {"#E8734A", "Coral"}, {"#E5678F", "Rose"}, {"#D9A03A", "Amber"},
     };
-    static final String[][] SURFACES = {{"warm", "Warm"}, {"neutral", "Neutral"}, {"black", "Black"}};
+    static final String[][] SURFACES = {{"warm", "Warm"}, {"neutral", "Neutral"}, {"black", "Black"}, {"amoled", "AMOLED"}, {"minimal", "Minimal"}, {"sunset", "Sunset"}, {"dynamic", "Dynamic"}};
     static final String[][] MODES = {{"system", "System"}, {"light", "Light"}, {"dark", "Dark"}};
 
     private static String applied = "";
@@ -32,7 +32,12 @@ final class Theme {
 
     /** {@link #SURFACES} with labels in the user's language. */
     static String[][] surfaces(Context c) {
-        return labeled(c, SURFACES, R.string.prefs_surface_warm, R.string.prefs_surface_neutral, R.string.prefs_surface_black);
+        String[][] out = new String[SURFACES.length][];
+        out[0] = new String[]{SURFACES[0][0], c.getString(R.string.prefs_surface_warm)};
+        out[1] = new String[]{SURFACES[1][0], c.getString(R.string.prefs_surface_neutral)};
+        out[2] = new String[]{SURFACES[2][0], c.getString(R.string.prefs_surface_black)};
+        for (int i = 3; i < SURFACES.length; i++) out[i] = SURFACES[i].clone();
+        return out;
     }
 
     /** {@link #MODES} with labels in the user's language. */
@@ -72,19 +77,49 @@ final class Theme {
                 case "black":
                     set(0xFF000000, 0xFF0D1119, 0xFF1A2230, 0xFF000000, 0xFF000000);
                     break;
+                case "amoled":
+                    set(0xFF000000, 0xFF080808, 0xFF151515, 0xFF000000, 0xFF000000);
+                    break;
+                case "minimal":
+                    set(0xFF101010, 0xFF1B1B1B, 0xFF262626, 0xFF101010, 0xFF050505);
+                    break;
+                case "sunset":
+                    set(0xFF1B100B, 0xFF29180F, 0xFF3A2114, 0xFF1B100B, 0xFF100904);
+                    break;
+                case "dynamic":
+                    set(systemColor(c, "system_neutral1_900", 0xFF101218),
+                            systemColor(c, "system_neutral1_800", 0xFF1B2028),
+                            systemColor(c, "system_neutral2_800", 0xFF252B34),
+                            systemColor(c, "system_neutral1_900", 0xFF101218), 0xFF050505);
+                    break;
                 default: // neutral: BestBuddy's own deep-navy palette
                     set(0xFF080E18, 0xFF111A28, 0xFF1B2740, 0xFF0C1420, 0xFF05090F);
             }
-            Ui.TEXT = 0xFFE9EFF9;
-            Ui.MUTED = 0xFF93A2B8;
+            Ui.TEXT = "sunset".equals(surface) ? 0xFFFFF1E6
+                    : "minimal".equals(surface) ? 0xFFF1F1F1
+                    : "dynamic".equals(surface) ? systemColor(c, "system_neutral1_50", 0xFFE9EFF9) : 0xFFE9EFF9;
+            Ui.MUTED = "sunset".equals(surface) ? 0xFFC9A894
+                    : "minimal".equals(surface) ? 0xFFA6A6A6
+                    : "dynamic".equals(surface) ? systemColor(c, "system_neutral2_200", 0xFF93A2B8) : 0xFF93A2B8;
             Ui.OK = 0xFF35C98A;
             Ui.ERR = 0xFFF0736F;
             Ui.USER = blend(accent, Ui.BG, 0.24f);
         } else {
             if ("warm".equals(surface)) set(0xFFF7F3EE, 0xFFFFFFFF, 0xFFECE5DD, 0xFFF1EBE4, 0xFF24121E);
-            else set(0xFFF4F7FC, 0xFFFFFFFF, 0xFFE8EEF9, 0xFFFFFFFF, 0xFF0A1222);
-            Ui.TEXT = 0xFF0E1A2B;
-            Ui.MUTED = 0xFF5F6F86;
+            else if ("minimal".equals(surface)) set(0xFFFAFAFA, 0xFFFFFFFF, 0xFFEEEEEE, 0xFFF7F7F7, 0xFF101010);
+            else if ("sunset".equals(surface)) set(0xFFFFF7F0, 0xFFFFFFFF, 0xFFF5E4D6, 0xFFFFF1E6, 0xFF24120B);
+            else if ("dynamic".equals(surface) && Build.VERSION.SDK_INT >= 31) {
+                set(systemColor(c, "system_neutral1_10", 0xFFF7F7FA),
+                        systemColor(c, "system_neutral1_50", 0xFFFFFFFF),
+                        systemColor(c, "system_neutral2_100", 0xFFE8E8EC),
+                        systemColor(c, "system_neutral1_10", 0xFFF7F7FA), 0xFF0A1222);
+            } else set(0xFFF4F7FC, 0xFFFFFFFF, 0xFFE8EEF9, 0xFFFFFFFF, 0xFF0A1222);
+            Ui.TEXT = "sunset".equals(surface) ? 0xFF2B170D : "minimal".equals(surface) ? 0xFF171717
+                    : "dynamic".equals(surface) && Build.VERSION.SDK_INT >= 31
+                    ? systemColor(c, "system_neutral1_900", 0xFF0E1A2B) : 0xFF0E1A2B;
+            Ui.MUTED = "sunset".equals(surface) ? 0xFF8B6650 : "minimal".equals(surface) ? 0xFF666666
+                    : "dynamic".equals(surface) && Build.VERSION.SDK_INT >= 31
+                    ? systemColor(c, "system_neutral2_700", 0xFF5F6F86) : 0xFF5F6F86;
             Ui.OK = 0xFF12A66A;
             Ui.ERR = 0xFFD93A3F;
             Ui.USER = blend(accent, Ui.CARD, 0.16f);
@@ -99,6 +134,14 @@ final class Theme {
         Ui.CODE_TEXT = 0xFFF4EFE6; // the code block stays dark in both modes
         Ui.DARK = dark;
         return true;
+    }
+
+    /** Read Android 12+ Material You system palette colours without linking a Google dependency. */
+    private static int systemColor(Context c, String name, int fallback) {
+        if (Build.VERSION.SDK_INT < 31) return fallback;
+        int id = c.getResources().getIdentifier(name, "color", "android");
+        if (id == 0) return fallback;
+        try { return c.getColor(id); } catch (Exception ignored) { return fallback; }
     }
 
     private static void set(int bg, int card, int card2, int nav, int code) {
