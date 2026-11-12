@@ -33,7 +33,7 @@ public class FreeLLMAPIActivity extends Screen {
         LinearLayout body = column(this);
         body.setPaddingRelative(dp(this, 20), dp(this, 8), dp(this, 20), dp(this, 28));
         body.addView(title(this, "One API key. Free-model routing.", 20));
-        body.addView(text(this, "BestBuddy runs FreeLLMAPI inside its private Alpine Linux environment. The local dashboard manages upstream provider credentials, model availability and fallback order. BestBuddy then connects through one unified FreeLLMAPI key.", 14, MUTED), gap(10));
+        body.addView(text(this, "BestBuddy runs FreeLLMAPI inside its private Alpine Linux environment. The local dashboard manages upstream provider credentials, model availability and fallback order. BestBuddy then connects through one unified FreeLLMAPI key. FreeLLMAPI prints its first-run setup code in the server log; use View setup log if the dashboard asks for it.", 14, MUTED), gap(10));
         status = text(this, "", 14, OK);
         status.setPaddingRelative(dp(this, 14), dp(this, 12), dp(this, 14), dp(this, 12));
         status.setBackground(rounded(this, CARD2, 12));
@@ -111,5 +111,5 @@ public class FreeLLMAPIActivity extends Screen {
         install.setEnabled(!installing());
     }
 
-    private boolean installing() { return false; }
+    private boolean installing() { return FreeLLMAPI.installing(); }
 }
