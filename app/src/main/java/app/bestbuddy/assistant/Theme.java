@@ -74,7 +74,8 @@ final class Theme {
         String surface = Prefs.surface(c);
         int accent = "dynamic".equals(surface) && Build.VERSION.SDK_INT >= 31
                 ? systemColor(c, "system_accent1_600", Prefs.accent(c)) : Prefs.accent(c);
-        String key = dark + "|" + accent + "|" + surface + "|" + Prefs.fontFamily(c);
+        String key = dark + "|" + accent + "|" + surface + "|" + Prefs.fontFamily(c)
+                + "|" + Prefs.appearanceWallpaper(c) + "|" + Prefs.glassBlur(c) + "|" + Prefs.motion(c);
         if (key.equals(applied)) return false;
         applied = key;
 
