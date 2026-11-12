@@ -159,6 +159,10 @@
             android:theme="@android:style/Theme.Translucent.NoTitleBar" />
 
         <activity
+            android:name=".ToolHubActivity"
+            android:exported="false" />
+
+        <activity
             android:name=".SetupActivity"
             android:exported="false" />
 

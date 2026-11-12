@@ -51,7 +51,11 @@ final class Ui {
     // ------------------------------------------------------------------ basics
 
     static int dp(Context c, int v) {
-        return Math.round(v * c.getResources().getDisplayMetrics().density);
+        float scale = 1f;
+        String size = Prefs.displaySize(c);
+        if ("compact".equals(size)) scale = 0.92f;
+        else if ("large".equals(size)) scale = 1.08f;
+        return Math.round(v * c.getResources().getDisplayMetrics().density * scale);
     }
 
     /** The app's language, for changing the case of text the user sees (Turkish i/İ). */
@@ -928,7 +932,7 @@ final class Ui {
     /** Chats · Sessions · Settings, with the active item highlighted. */
     static LinearLayout bottomNav(Activity a, int active, int sessionsBadge) {
         LinearLayout bar = row(a);
-        bar.setBackgroundColor(NAV);
+        bar.setBackground(Prefs.dockGlass(a) ? rounded(a, Theme.withAlpha(NAV, 0xE8), 24) : rounded(a, NAV, 0));
         bar.setGravity(Gravity.CENTER);
         bar.setElevation(dp(a, 8));
         Object[][] items = {
@@ -980,7 +984,19 @@ final class Ui {
         View line = new View(a);
         line.setBackgroundColor(LINE);
         wrap.addView(line, new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(a, 1)));
+        if (Prefs.dockHighlights(a)) {
+            View edge = new View(a);
+            edge.setBackgroundColor(Theme.withAlpha(ACCENT, 0x70));
+            wrap.addView(edge, new LinearLayout.LayoutParams(-1, dp(a, 1)));
+        }
         wrap.addView(bar, full());
+        if (Prefs.dockReflection(a)) {
+            View reflection = new View(a);
+            reflection.setBackground(new android.graphics.drawable.GradientDrawable(
+                    android.graphics.drawable.GradientDrawable.Orientation.TOP_BOTTOM,
+                    new int[]{Theme.withAlpha(ACCENT, 0x35), 0x00000000}));
+            wrap.addView(reflection, new LinearLayout.LayoutParams(-1, dp(a, 3)));
+        }
         return wrap;
     }
 }

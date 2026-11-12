@@ -748,6 +748,17 @@ final class Prefs {
     }
 
     /** Motion preference: off, subtle, or full. */
+    static boolean dockGlass(Context c) { return sp(c).getBoolean("dock_glass", true); }
+    static void setDockGlass(Context c, boolean v) { sp(c).edit().putBoolean("dock_glass", v).apply(); }
+    static boolean dockHighlights(Context c) { return sp(c).getBoolean("dock_highlights", true); }
+    static void setDockHighlights(Context c, boolean v) { sp(c).edit().putBoolean("dock_highlights", v).apply(); }
+    static boolean dockReflection(Context c) { return sp(c).getBoolean("dock_reflection", false); }
+    static void setDockReflection(Context c, boolean v) { sp(c).edit().putBoolean("dock_reflection", v).apply(); }
+    static boolean saturatedColours(Context c) { return sp(c).getBoolean("saturated_colours", false); }
+    static void setSaturatedColours(Context c, boolean v) { sp(c).edit().putBoolean("saturated_colours", v).apply(); }
+    static String displaySize(Context c) { return sp(c).getString("display_size", "standard"); }
+    static void setDisplaySize(Context c, String v) { sp(c).edit().putString("display_size", v).apply(); }
+
     static String motion(Context c) {
         return sp(c).getString("appearance_motion", "subtle");
     }

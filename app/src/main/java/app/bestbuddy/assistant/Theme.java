@@ -75,7 +75,8 @@ final class Theme {
         int accent = "dynamic".equals(surface) && Build.VERSION.SDK_INT >= 31
                 ? systemColor(c, "system_accent1_600", Prefs.accent(c)) : Prefs.accent(c);
         String key = dark + "|" + accent + "|" + surface + "|" + Prefs.fontFamily(c)
-                + "|" + Prefs.appearanceWallpaper(c) + "|" + Prefs.glassBlur(c) + "|" + Prefs.motion(c);
+                + "|" + Prefs.appearanceWallpaper(c) + "|" + Prefs.glassBlur(c) + "|" + Prefs.motion(c)
+                + "|" + Prefs.saturatedColours(c);
         if (key.equals(applied)) return false;
         applied = key;
 
@@ -147,6 +148,12 @@ final class Theme {
             Ui.OK = 0xFF12A66A;
             Ui.ERR = 0xFFD93A3F;
             Ui.USER = blend(accent, Ui.CARD, 0.16f);
+        }
+        if (Prefs.saturatedColours(c)) {
+            float[] hsv = new float[3];
+            Color.colorToHSV(accent, hsv);
+            hsv[1] = Math.min(1f, hsv[1] * 1.28f + 0.08f);
+            accent = Color.HSVToColor(hsv);
         }
         Ui.ACCENT = accent;
         Ui.ON_ACCENT = luminance(accent) > 0.45 ? 0xFF1A1714 : 0xFFFFFFFF;
