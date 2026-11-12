@@ -61,7 +61,16 @@ final class Ui {
 
     /** Geist at a weight (400…700); falls back to the system font. */
     static Typeface sans(Context c, int weight) {
-        return font(c, "fonts/Geist.ttf", weight, weight >= 600 ? Typeface.DEFAULT_BOLD : Typeface.DEFAULT);
+        String family = Prefs.fontFamily(c);
+        int style = weight >= 600 ? Typeface.BOLD : Typeface.NORMAL;
+        switch (family) {
+            case "system": return Typeface.create("sans-serif", style);
+            case "rounded": return Typeface.create("sans-serif-rounded", style);
+            case "serif": return Typeface.create("serif", style);
+            case "mono": return Typeface.create("monospace", style);
+            case "condensed": return Typeface.create("sans-serif-condensed", style);
+            default: return font(c, "fonts/Geist.ttf", weight, weight >= 600 ? Typeface.DEFAULT_BOLD : Typeface.DEFAULT);
+        }
     }
 
     /** Geist Mono at a weight; falls back to the system monospace. */

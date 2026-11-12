@@ -233,6 +233,15 @@ final class Prefs {
         sp(c).edit().putString("theme_mode", m).apply();
     }
 
+    /** Appearance typeface: Geist (default), system, rounded, serif or monospace. */
+    static String fontFamily(Context c) {
+        return sp(c).getString("font_family", "geist");
+    }
+
+    static void setFontFamily(Context c, String family) {
+        sp(c).edit().putString("font_family", family).apply();
+    }
+
     /** Accent colour (opaque ARGB). */
     static int accent(Context c) {
         return sp(c).getInt("accent", 0xFF3D6FE0);
@@ -727,5 +736,32 @@ final class Prefs {
 
     static void setDualModels(Context c, boolean on) {
         sp(c).edit().putBoolean("dual_models", on).apply();
+    }
+
+    /** Persisted user-selected wallpaper URI (granted through the Storage Access Framework). */
+    static String appearanceWallpaper(Context c) {
+        return sp(c).getString("appearance_wallpaper", "");
+    }
+
+    static void setAppearanceWallpaper(Context c, String uri) {
+        sp(c).edit().putString("appearance_wallpaper", uri == null ? "" : uri).apply();
+    }
+
+    /** Motion preference: off, subtle, or full. */
+    static String motion(Context c) {
+        return sp(c).getString("appearance_motion", "subtle");
+    }
+
+    static void setMotion(Context c, String value) {
+        sp(c).edit().putString("appearance_motion", value).apply();
+    }
+
+    /** Android window backdrop blur radius, in dp; zero disables the blur. */
+    static int glassBlur(Context c) {
+        return sp(c).getInt("glass_blur", 28);
+    }
+
+    static void setGlassBlur(Context c, int radiusDp) {
+        sp(c).edit().putInt("glass_blur", Math.max(0, Math.min(64, radiusDp))).apply();
     }
 }

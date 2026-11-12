@@ -4,8 +4,15 @@ import android.app.Activity;
 import android.content.Context;
 import android.content.res.Configuration;
 import android.graphics.Color;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
+import android.graphics.drawable.BitmapDrawable;
+import android.graphics.drawable.ColorDrawable;
+import android.net.Uri;
+import android.os.Build;
 import android.view.View;
 import android.view.Window;
+import android.view.WindowManager;
 
 /**
  * Computes BestBuddy's palette from the user's appearance settings (mode, accent, surface style) and
@@ -16,7 +23,7 @@ final class Theme {
             {"#3D6FE0", "Ocean"}, {"#7C5CE0", "Violet"}, {"#12B886", "Mint"},
             {"#E8734A", "Coral"}, {"#E5678F", "Rose"}, {"#D9A03A", "Amber"},
     };
-    static final String[][] SURFACES = {{"warm", "Warm"}, {"neutral", "Neutral"}, {"black", "Black"}};
+    static final String[][] SURFACES = {{"warm", "Warm"}, {"neutral", "Neutral"}, {"black", "Black"}, {"amoled", "AMOLED"}, {"minimal", "Minimal"}, {"sunset", "Sunset"}, {"glass", "Liquid Glass style"}, {"cyberpunk", "Cyberpunk"}, {"dynamic", "Dynamic"}};
     static final String[][] MODES = {{"system", "System"}, {"light", "Light"}, {"dark", "Dark"}};
 
     private static String applied = "";
@@ -32,7 +39,13 @@ final class Theme {
 
     /** {@link #SURFACES} with labels in the user's language. */
     static String[][] surfaces(Context c) {
-        return labeled(c, SURFACES, R.string.prefs_surface_warm, R.string.prefs_surface_neutral, R.string.prefs_surface_black);
+        String[][] out = new String[SURFACES.length][];
+        out[0] = new String[]{SURFACES[0][0], c.getString(R.string.prefs_surface_warm)};
+        out[1] = new String[]{SURFACES[1][0], c.getString(R.string.prefs_surface_neutral)};
+        out[2] = new String[]{SURFACES[2][0], c.getString(R.string.prefs_surface_black)};
+        int count = Build.VERSION.SDK_INT >= 31 ? SURFACES.length : SURFACES.length - 1;
+        for (int i = 3; i < count; i++) out[i] = SURFACES[i].clone();
+        return java.util.Arrays.copyOf(out, count);
     }
 
     /** {@link #MODES} with labels in the user's language. */
@@ -58,9 +71,11 @@ final class Theme {
     /** Fill Ui's palette for the current settings. Cheap; returns whether anything changed. */
     static boolean load(Context c) {
         boolean dark = isDark(c);
-        int accent = Prefs.accent(c);
         String surface = Prefs.surface(c);
-        String key = dark + "|" + accent + "|" + surface;
+        int accent = "dynamic".equals(surface) && Build.VERSION.SDK_INT >= 31
+                ? systemColor(c, "system_accent1_600", Prefs.accent(c)) : Prefs.accent(c);
+        String key = dark + "|" + accent + "|" + surface + "|" + Prefs.fontFamily(c)
+                + "|" + Prefs.appearanceWallpaper(c) + "|" + Prefs.glassBlur(c) + "|" + Prefs.motion(c);
         if (key.equals(applied)) return false;
         applied = key;
 
@@ -72,19 +87,63 @@ final class Theme {
                 case "black":
                     set(0xFF000000, 0xFF0D1119, 0xFF1A2230, 0xFF000000, 0xFF000000);
                     break;
+                case "amoled":
+                    set(0xFF000000, 0xFF080808, 0xFF151515, 0xFF000000, 0xFF000000);
+                    break;
+                case "minimal":
+                    set(0xFF101010, 0xFF1B1B1B, 0xFF262626, 0xFF101010, 0xFF050505);
+                    break;
+                case "sunset":
+                    set(0xFF1B100B, 0xFF29180F, 0xFF3A2114, 0xFF1B100B, 0xFF100904);
+                    break;
+                case "glass":
+                    set(0xCC101722, 0xCC26364B, 0xB3223043, 0xD9121B2A, 0xFF070B12);
+                    break;
+                case "cyberpunk":
+                    set(0xFF080615, 0xFF15102B, 0xFF251644, 0xFF0B0719, 0xFF05030C);
+                    break;
+                case "dynamic":
+                    set(systemColor(c, "system_neutral1_900", 0xFF101218),
+                            systemColor(c, "system_neutral1_800", 0xFF1B2028),
+                            systemColor(c, "system_neutral2_800", 0xFF252B34),
+                            systemColor(c, "system_neutral1_900", 0xFF101218), 0xFF050505);
+                    break;
                 default: // neutral: BestBuddy's own deep-navy palette
                     set(0xFF080E18, 0xFF111A28, 0xFF1B2740, 0xFF0C1420, 0xFF05090F);
             }
-            Ui.TEXT = 0xFFE9EFF9;
-            Ui.MUTED = 0xFF93A2B8;
+            Ui.TEXT = "sunset".equals(surface) ? 0xFFFFF1E6
+                    : "minimal".equals(surface) ? 0xFFF1F1F1
+                    : "glass".equals(surface) ? 0xFFEDF4FF
+                    : "cyberpunk".equals(surface) ? 0xFFF4ECFF
+                    : "dynamic".equals(surface) ? systemColor(c, "system_neutral1_50", 0xFFE9EFF9) : 0xFFE9EFF9;
+            Ui.MUTED = "sunset".equals(surface) ? 0xFFC9A894
+                    : "minimal".equals(surface) ? 0xFFA6A6A6
+                    : "glass".equals(surface) ? 0xFFA8B9CE
+                    : "cyberpunk".equals(surface) ? 0xFFB9A6D9
+                    : "dynamic".equals(surface) ? systemColor(c, "system_neutral2_200", 0xFF93A2B8) : 0xFF93A2B8;
             Ui.OK = 0xFF35C98A;
             Ui.ERR = 0xFFF0736F;
             Ui.USER = blend(accent, Ui.BG, 0.24f);
         } else {
             if ("warm".equals(surface)) set(0xFFF7F3EE, 0xFFFFFFFF, 0xFFECE5DD, 0xFFF1EBE4, 0xFF24121E);
-            else set(0xFFF4F7FC, 0xFFFFFFFF, 0xFFE8EEF9, 0xFFFFFFFF, 0xFF0A1222);
-            Ui.TEXT = 0xFF0E1A2B;
-            Ui.MUTED = 0xFF5F6F86;
+            else if ("minimal".equals(surface)) set(0xFFFAFAFA, 0xFFFFFFFF, 0xFFEEEEEE, 0xFFF7F7F7, 0xFF101010);
+            else if ("sunset".equals(surface)) set(0xFFFFF7F0, 0xFFFFFFFF, 0xFFF5E4D6, 0xFFFFF1E6, 0xFF24120B);
+            else if ("glass".equals(surface)) set(0xDDE8EFF8, 0xDFFFFFFF, 0xC9F0F5FF, 0xD9E2EAF5, 0xFF101827);
+            else if ("cyberpunk".equals(surface)) set(0xFFF5F0FF, 0xFFFFFFFF, 0xFFE9DFFF, 0xFFF0E8FF, 0xFF130B24);
+            else if ("dynamic".equals(surface) && Build.VERSION.SDK_INT >= 31) {
+                set(systemColor(c, "system_neutral1_10", 0xFFF7F7FA),
+                        systemColor(c, "system_neutral1_50", 0xFFFFFFFF),
+                        systemColor(c, "system_neutral2_100", 0xFFE8E8EC),
+                        systemColor(c, "system_neutral1_10", 0xFFF7F7FA), 0xFF0A1222);
+            } else set(0xFFF4F7FC, 0xFFFFFFFF, 0xFFE8EEF9, 0xFFFFFFFF, 0xFF0A1222);
+            Ui.TEXT = "sunset".equals(surface) ? 0xFF2B170D : "minimal".equals(surface) ? 0xFF171717
+                    : "glass".equals(surface) ? 0xFF142033 : "cyberpunk".equals(surface) ? 0xFF20123B
+                    : "dynamic".equals(surface) && Build.VERSION.SDK_INT >= 31
+                    ? systemColor(c, "system_neutral1_900", 0xFF0E1A2B) : 0xFF0E1A2B;
+            Ui.MUTED = "sunset".equals(surface) ? 0xFF8B6650 : "minimal".equals(surface) ? 0xFF666666
+                    : "glass".equals(surface) ? 0xFF60758F : "cyberpunk".equals(surface) ? 0xFF76638F
+                    : "dynamic".equals(surface) && Build.VERSION.SDK_INT >= 31
+                    ? systemColor(c, "system_neutral2_700", 0xFF5F6F86) : 0xFF5F6F86;
             Ui.OK = 0xFF12A66A;
             Ui.ERR = 0xFFD93A3F;
             Ui.USER = blend(accent, Ui.CARD, 0.16f);
@@ -99,6 +158,14 @@ final class Theme {
         Ui.CODE_TEXT = 0xFFF4EFE6; // the code block stays dark in both modes
         Ui.DARK = dark;
         return true;
+    }
+
+    /** Read Android 12+ Material You system palette colours without linking a Google dependency. */
+    private static int systemColor(Context c, String name, int fallback) {
+        if (Build.VERSION.SDK_INT < 31) return fallback;
+        int id = c.getResources().getIdentifier(name, "color", "android");
+        if (id == 0) return fallback;
+        try { return c.getColor(id); } catch (Exception ignored) { return fallback; }
     }
 
     private static void set(int bg, int card, int card2, int nav, int code) {
@@ -122,6 +189,53 @@ final class Theme {
             flags |= View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR | View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR;
         }
         w.getDecorView().setSystemUiVisibility(flags);
+
+        // Real Android 12+ backdrop blur. The translucent glass palette lets the OS blur
+        // the content behind the activity window; older Android versions keep the glass tint.
+        boolean glass = "glass".equals(Prefs.surface(a));
+        if (Build.VERSION.SDK_INT >= 31) {
+            if (glass && Prefs.glassBlur(a) > 0) {
+                w.addFlags(WindowManager.LayoutParams.FLAG_BLUR_BEHIND
+                        | WindowManager.LayoutParams.FLAG_DIM_BEHIND);
+                w.setDimAmount(0.12f);
+                w.setBackgroundBlurRadius(Ui.dp(a, Prefs.glassBlur(a)));
+                w.setBackgroundDrawable(new ColorDrawable(0x990D1725));
+            } else {
+                w.clearFlags(WindowManager.LayoutParams.FLAG_BLUR_BEHIND
+                        | WindowManager.LayoutParams.FLAG_DIM_BEHIND);
+                w.setBackgroundBlurRadius(0);
+                w.setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
+            }
+        }
+
+        // A user-selected image is loaded behind the translucent glass surfaces. Decode at
+        // screen-sized resolution to avoid retaining a full camera-resolution bitmap.
+        String wallpaper = Prefs.appearanceWallpaper(a);
+        if (wallpaper != null && !wallpaper.isEmpty()) {
+            try (java.io.InputStream in = a.getContentResolver().openInputStream(Uri.parse(wallpaper))) {
+                if (in != null) {
+                    BitmapFactory.Options bounds = new BitmapFactory.Options();
+                    bounds.inJustDecodeBounds = true;
+                    // SAF streams are not guaranteed to support mark/reset; reopen for decode.
+                    BitmapFactory.decodeStream(in, null, bounds);
+                    BitmapFactory.Options opts = new BitmapFactory.Options();
+                    int target = Math.max(a.getResources().getDisplayMetrics().widthPixels,
+                            a.getResources().getDisplayMetrics().heightPixels);
+                    int sample = 1;
+                    while (bounds.outWidth / sample > target * 2 || bounds.outHeight / sample > target * 2) sample *= 2;
+                    opts.inSampleSize = sample;
+                    try (java.io.InputStream image = a.getContentResolver().openInputStream(Uri.parse(wallpaper))) {
+                        Bitmap bitmap = BitmapFactory.decodeStream(image, null, opts);
+                        if (bitmap != null) w.getDecorView().setBackground(new BitmapDrawable(a.getResources(), bitmap));
+                    }
+                }
+            } catch (Exception ignored) {
+                Prefs.setAppearanceWallpaper(a, "");
+                w.getDecorView().setBackgroundColor(Color.TRANSPARENT);
+            }
+        } else {
+            w.getDecorView().setBackgroundColor(Color.TRANSPARENT);
+        }
     }
 
     /** Settings changed: recalc, and tell the bubble to restyle itself. */
