@@ -66,6 +66,14 @@ final class Prefs {
         sp(c).edit().putBoolean("agents_tap_buddy", on).apply();
     }
 
+    /** Allow routine, non-sensitive confirmations to proceed unattended in eligible apps. */
+    static boolean autoRoutine(Context c) { return sp(c).getBoolean("auto_routine", false); }
+    static void setAutoRoutine(Context c, boolean on) { sp(c).edit().putBoolean("auto_routine", on).apply(); }
+
+    /** Allow routine screen taps without a reviewer in eligible apps; risky controls and password fields still require checks. */
+    static boolean autoTap(Context c) { return sp(c).getBoolean("auto_tap", false); }
+    static void setAutoTap(Context c, boolean on) { sp(c).edit().putBoolean("auto_tap", on).apply(); }
+
     /** Notify when a new BestBuddy release is out (checked about once a day). */
     static boolean updateNotices(Context c) {
         return !Flavor.FDROID && sp(c).getBoolean("update_notices", true);
