@@ -38,7 +38,7 @@ final class Account {
     static final Account GROK = new Account("grok");
     static final Account GEMINI = new Account("gemini");
     static final Account[] ALL = {CLAUDE, CODEX, OPENCODE, AGY, GROK, GEMINI};
-    /** The agents offered to the user: Claude Code is not one of them (it needs a paid plan). */
+    /** Only account-backed agents with a free-tier access path are offered. */
     static final Account[] OFFERED = {OPENCODE, GEMINI, AGY, GROK};
 
     static Account of(String agent) {
