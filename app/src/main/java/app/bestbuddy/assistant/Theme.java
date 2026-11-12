@@ -37,8 +37,9 @@ final class Theme {
         out[0] = new String[]{SURFACES[0][0], c.getString(R.string.prefs_surface_warm)};
         out[1] = new String[]{SURFACES[1][0], c.getString(R.string.prefs_surface_neutral)};
         out[2] = new String[]{SURFACES[2][0], c.getString(R.string.prefs_surface_black)};
-        for (int i = 3; i < SURFACES.length; i++) out[i] = SURFACES[i].clone();
-        return out;
+        int count = Build.VERSION.SDK_INT >= 31 ? SURFACES.length : SURFACES.length - 1;
+        for (int i = 3; i < count; i++) out[i] = SURFACES[i].clone();
+        return java.util.Arrays.copyOf(out, count);
     }
 
     /** {@link #MODES} with labels in the user's language. */
