@@ -2186,4 +2186,14 @@
     <string name="models_kilo_adding">Asking Kilo for its models…</string>
     <string name="models_kilo_failed">Could not add Kilo: %1$s</string>
     <string name="api_keys_no_key_hint">This service needs no API key.</string>
+
+    <!-- Auto-Pilot: unattended routine work, never a blanket permission for sensitive actions. -->
+    <string name="autopilot_title">Auto-Pilot</string>
+    <string name="autopilot_approval_title">Auto-approve routine steps</string>
+    <string name="autopilot_approval_text">Let BestBuddy approve routine, non-sensitive confirmations in eligible apps while you are away. It does not approve messages, posts, payments, purchases, deletes, installs, passwords or security changes.</string>
+    <string name="autopilot_tap_title">Auto-Tap routine controls</string>
+    <string name="autopilot_tap_text">Allow taps on ordinary controls without waiting for a reviewer in eligible apps. Password fields and risky buttons still use the existing safeguards.</string>
+    <string name="autopilot_limits">Auto-Pilot cannot unlock your phone, bypass Android permissions, interact with protected screens or guarantee operation while Android suspends the app. Keep sensitive apps on Hard or Smart. You can turn these options off here at any time.</string>
+    <string name="autopilot_enabled">Auto-Pilot option enabled</string>
+    <string name="autopilot_disabled">Auto-Pilot option disabled</string>
 </resources>

@@ -435,6 +435,17 @@ final class Guard {
      * A confirm's text a run rule may approve: nothing in it pays, buys, deletes, installs, or names a password, code,
      * card or security setting. Sending is fine. Every word is checked as a button label would be.
      */
+    /** Auto-Pilot may approve only non-sensitive routine confirmations; any send/post/delete/pay/etc. wording is excluded. */
+    static boolean autoRoutineText(String s) {
+        if (!routineText(s)) return false;
+        for (int i = 0; i < s.length(); i++) {
+            if (!Character.isLetter(s.charAt(i))) continue;
+            if (i > 0 && Character.isLetter(s.charAt(i - 1))) continue;
+            if (RISKY.matcher(s.substring(i)).find()) return false;
+        }
+        return true;
+    }
+
     static boolean routineText(String s) {
         if (s == null || s.trim().isEmpty() || NEVER_WORDS.matcher(s).find()) return false;
         for (int i = 0; i < s.length(); i++) {
