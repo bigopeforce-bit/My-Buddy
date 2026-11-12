@@ -1,6 +1,7 @@
 package app.bestbuddy.assistant;
 
 import android.app.Activity;
+import android.app.AlertDialog;
 import android.content.Intent;
 import android.net.Uri;
 import android.os.Bundle;
@@ -120,12 +121,45 @@ public final class FreeSkillsActivity extends Screen {
             Toast.makeText(this, "Set up BestBuddy Linux before installing skills. You can still download the .MD file.", Toast.LENGTH_LONG).show();
             return;
         }
-        Toast.makeText(this, "Downloading " + item.title + "…", Toast.LENGTH_SHORT).show();
+        Toast.makeText(this, "Downloading " + item.title + " for review…", Toast.LENGTH_SHORT).show();
+        new Thread(() -> {
+            try {
+                String markdown = FreeSkillsCatalog.fetch(item);
+                runOnUiThread(() -> showSkillReview(item, markdown));
+            } catch (Exception e) {
+                String message = e.getMessage() == null ? "Skill download failed." : e.getMessage();
+                runOnUiThread(() -> Toast.makeText(this, message, Toast.LENGTH_LONG).show());
+            }
+        }, "free-skill-review").start();
+    }
+
+    private void showSkillReview(FreeSkillsCatalog.Item item, String markdown) {
+        if (isFinishing() || isDestroyed()) return;
+        TextView preview = text(this, markdown, 12, TEXT);
+        preview.setTextIsSelectable(true);
+        preview.setPadding(dp(this, 14), dp(this, 12), dp(this, 14), dp(this, 12));
+        ScrollView scroll = new ScrollView(this);
+        scroll.setFillViewport(true);
+        scroll.addView(preview);
+        AlertDialog dialog = new AlertDialog.Builder(this)
+                .setTitle("Review " + item.title)
+                .setMessage(item.source + "\\nPinned revision: " + item.revision + "\\nDeclared licence: " + item.license
+                        + "\\n\\nThis file becomes instructions for your AI agents. Review its contents before installing.")
+                .setView(scroll)
+                .setNegativeButton("Cancel", null)
+                .setPositiveButton("Install skill", (d, which) -> installReviewedSkill(item, markdown))
+                .create();
+        dialog.show();
+        dialog.getWindow().setLayout(
+                Math.min(getResources().getDisplayMetrics().widthPixels - dp(this, 32), dp(this, 560)),
+                Math.min(getResources().getDisplayMetrics().heightPixels - dp(this, 160), dp(this, 560)));
+    }
+
+    private void installReviewedSkill(FreeSkillsCatalog.Item item, String markdown) {
         new Thread(() -> {
             String message;
             try {
-                String md = FreeSkillsCatalog.fetch(item);
-                String name = Skills.installMarkdown(this, item.name, md);
+                String name = Skills.installMarkdown(this, item.name, markdown);
                 message = "Installed /" + name + ". Your agents can use it now.";
             } catch (Exception e) {
                 message = e.getMessage() == null ? "Skill installation failed." : e.getMessage();
