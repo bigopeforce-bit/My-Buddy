@@ -277,28 +277,9 @@ public class SetupActivity extends Screen implements Account.Listener, RemoteSes
         list.addView(sectionLabel(this, getString(R.string.setup_appearance)));
         LinearLayout ap = card();
         ap.setPaddingRelative(dp(this, 16), dp(this, 14), dp(this, 16), dp(this, 16));
-        ap.addView(fieldLabel(getString(R.string.setup_theme_mode), null));
-        ap.addView(segmented(this, Theme.modes(this), Prefs.themeMode(this), false, v -> {
-            Prefs.setThemeMode(this, v);
-            themeChanged();
-        }), topGap(8));
-        ap.addView(fieldLabel("Typeface", Prefs.fontFamily(this).toUpperCase(java.util.Locale.ROOT)), topGap(18));
-        ap.addView(segmented(this, new String[][]{{"geist", "Geist"}, {"system", "System"},
-                {"rounded", "Rounded"}, {"serif", "Serif"}, {"mono", "Mono"}, {"condensed", "Condensed"}},
-                Prefs.fontFamily(this), false, v -> {
-                    Prefs.setFontFamily(this, v);
-                    themeChanged();
-                }), topGap(8));
-        ap.addView(fieldLabel(getString(R.string.setup_accent), Theme.hex(Prefs.accent(this))), topGap(18));
-        ap.addView(swatches(), topGap(10));
-        ap.addView(fieldLabel(getString(R.string.setup_surface), null), topGap(18));
-        ap.addView(segmented(this, Theme.surfaces(this), Prefs.surface(this), false, v -> {
-            Prefs.setSurface(this, v);
-            themeChanged();
-        }), topGap(8));
-        TextView sn = text(this, getString(R.string.setup_surface_note), 13, MUTED);
-        ap.addView(sn, topGap(8));
-        // BestBuddy's look: the drawn face, or a picture the user picks (issue #10)
+        ap.addView(navRow(R.drawable.ms_tune, "Appearance settings",
+                "Themes, colours and typography", true, AppearanceActivity.class));
+                // BestBuddy's look: the drawn face, or a picture the user picks (issue #10)
         boolean own = Face.picture(this) != null;
         ap.addView(fieldLabel(getString(R.string.setup_face), null), topGap(18));
         LinearLayout fr = row(this);
