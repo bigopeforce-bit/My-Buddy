@@ -64,8 +64,9 @@ final class Theme {
     /** Fill Ui's palette for the current settings. Cheap; returns whether anything changed. */
     static boolean load(Context c) {
         boolean dark = isDark(c);
-        int accent = Prefs.accent(c);
         String surface = Prefs.surface(c);
+        int accent = "dynamic".equals(surface) && Build.VERSION.SDK_INT >= 31
+                ? systemColor(c, "system_accent1_600", Prefs.accent(c)) : Prefs.accent(c);
         String key = dark + "|" + accent + "|" + surface;
         if (key.equals(applied)) return false;
         applied = key;
