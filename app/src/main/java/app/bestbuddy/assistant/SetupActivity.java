@@ -580,7 +580,7 @@ public class SetupActivity extends Screen implements Account.Listener, RemoteSes
                 LinearLayout.LayoutParams sp = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, dp(this, 44));
                 sp.topMargin = dp(this, 12);
                 how.addView(sshCopy, sp);
-                Button sshRun = button(this, getString(R.string.setup_run_termux), false);
+                Button sshRun = button(this, "Run setup in Termux", false);
                 sshRun.setOnClickListener(v -> TermuxRunner.run(this, sshCommand(SshServer.newCode())));
                 LinearLayout.LayoutParams rp = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, dp(this, 44));
                 rp.topMargin = dp(this, 8);
