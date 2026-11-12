@@ -25,10 +25,7 @@ final class Models {
     /** Gemini CLI's models (--model); Auto lets it pick the best Gemini 3 model for the task. */
     static final String[][] GEMINI = {
             {"", "Default"},
-            {"auto", "Auto (Gemini 3)"},
-            {"gemini-3-pro-preview", "Gemini 3 Pro"},
             {"gemini-3-flash-preview", "Gemini 3 Flash"},
-            {"gemini-2.5-pro", "Gemini 2.5 Pro"},
             {"gemini-2.5-flash", "Gemini 2.5 Flash"},
             {"gemini-2.5-flash-lite", "Gemini 2.5 Flash Lite"},
     };
@@ -327,8 +324,16 @@ final class Models {
 
     /** OpenCode's models as JSON [[id, name], …] ("provider/model" for both). */
     static void setOpencode(String json) {
-        String[][] m = parse(json);
-        if (m != null) opencodeLive = m;
+        String[][] parsed = parse(json);
+        if (parsed == null) return;
+        java.util.List<String[]> free = new java.util.ArrayList<>();
+        free.add(parsed[0]);
+        for (int i = 1; i < parsed.length; i++) {
+            String id = parsed[i][0].toLowerCase(java.util.Locale.ROOT);
+            if (id.equals("opencode/big-pickle") || id.endsWith(":free") || id.endsWith("/free")) free.add(parsed[i]);
+        }
+        if (free.size() > 1) opencodeLive = free.toArray(new String[0][]);
+        else opencodeLive = null; // retain the known free OpenCode model if no free markers are reported
     }
 
     /** Antigravity's models as JSON [[id, name], …]. */
