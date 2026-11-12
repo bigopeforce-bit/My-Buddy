@@ -39,7 +39,7 @@ final class Account {
     static final Account GEMINI = new Account("gemini");
     static final Account[] ALL = {CLAUDE, CODEX, OPENCODE, AGY, GROK, GEMINI};
     /** The agents offered to the user: Claude Code is not one of them (it needs a paid plan). */
-    static final Account[] OFFERED = {OPENCODE, GEMINI, CODEX, AGY, GROK};
+    static final Account[] OFFERED = {OPENCODE, GEMINI, AGY, GROK};
 
     static Account of(String agent) {
         return "codex".equals(agent) ? CODEX : "opencode".equals(agent) ? OPENCODE : "agy".equals(agent) ? AGY
