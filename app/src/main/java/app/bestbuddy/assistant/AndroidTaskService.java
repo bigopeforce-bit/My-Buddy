@@ -19,6 +19,7 @@ public final class AndroidTaskService extends Service {
     private static final String CHANNEL = "task_runtime";
     private static final int NOTIFICATION_ID = 31;
     private static final String ACTION_START = "app.bestbuddy.assistant.TASK_START";
+    private static final String ACTION_STOP = "app.bestbuddy.assistant.TASK_STOP";
 
     static void start(Context context) {
         Intent intent = new Intent(context, AndroidTaskService.class).setAction(ACTION_START);
@@ -52,16 +53,28 @@ public final class AndroidTaskService extends Service {
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
+        if (intent != null && ACTION_STOP.equals(intent.getAction())) {
+            // Stop every active chat through the same controller used by the in-app Stop control.
+            // Keep this foreground anchor alive until the agent reports each run has ended.
+            ChatHub.get(this).stopAll();
+            return START_NOT_STICKY;
+        }
         Intent open = new Intent(this, MainActivity.class)
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
         PendingIntent pending = PendingIntent.getActivity(this, 31, open,
                 PendingIntent.FLAG_IMMUTABLE | PendingIntent.FLAG_UPDATE_CURRENT);
+        Intent stop = new Intent(this, AndroidTaskService.class).setAction(ACTION_STOP);
+        PendingIntent stopPending = PendingIntent.getService(this, 32, stop,
+                PendingIntent.FLAG_IMMUTABLE | PendingIntent.FLAG_UPDATE_CURRENT);
         Notification notification = new Notification.Builder(this, CHANNEL)
                 .setSmallIcon(R.drawable.ic_launcher_monochrome)
                 .setContentTitle("BestBuddy is working")
-                .setContentText("An AI task is active. Tap to return or stop it.")
+                .setContentText("An AI task is active. Tap to return, or use Stop to end active tasks.")
                 .setCategory(Notification.CATEGORY_SERVICE)
                 .setContentIntent(pending)
+                .addAction(new Notification.Action.Builder(
+                        android.graphics.drawable.Icon.createWithResource(this, R.drawable.ic_launcher_monochrome),
+                        "Stop", stopPending).build())
                 .setOngoing(true)
                 .setOnlyAlertOnce(true)
                 .build();
