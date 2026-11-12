@@ -135,7 +135,9 @@ public final class FreeSkillsActivity extends Screen {
 
     private void showSkillReview(FreeSkillsCatalog.Item item, String markdown) {
         if (isFinishing() || isDestroyed()) return;
-        TextView preview = text(this, markdown, 12, TEXT);
+        TextView preview = text(this, "Source: " + item.source + "\nPinned revision: " + item.revision + "\nDeclared licence: " + item.license
+                + "\n\nThis file becomes instructions for your AI agents. Review its contents before installing.\n\n"
+                + markdown, 12, TEXT);
         preview.setTextIsSelectable(true);
         preview.setPadding(dp(this, 14), dp(this, 12), dp(this, 14), dp(this, 12));
         ScrollView scroll = new ScrollView(this);
@@ -143,8 +145,6 @@ public final class FreeSkillsActivity extends Screen {
         scroll.addView(preview);
         AlertDialog dialog = new AlertDialog.Builder(this)
                 .setTitle("Review " + item.title)
-                .setMessage(item.source + "\\nPinned revision: " + item.revision + "\\nDeclared licence: " + item.license
-                        + "\\n\\nThis file becomes instructions for your AI agents. Review its contents before installing.")
                 .setView(scroll)
                 .setNegativeButton("Cancel", null)
                 .setPositiveButton("Install skill", (d, which) -> installReviewedSkill(item, markdown))
