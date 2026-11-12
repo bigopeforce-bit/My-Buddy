@@ -302,7 +302,9 @@ final class Relay {
             java.util.List<Providers.P> candidates = new java.util.ArrayList<>();
             candidates.add(original);
             for (Providers.P candidate : Providers.all()) if (candidate != original) candidates.add(candidate);
+            int attempts = 0;
             for (Providers.P candidate : candidates) {
+                if (Providers.off(c, Providers.apiId(candidate.id))) continue;
                 String candidateBase = anthropic ? candidate.anthropic : candidate.openai;
                 if (candidateBase.isEmpty()) continue;
                 for (int i = 0; i < candidate.offered().length(); i++) {
@@ -311,6 +313,7 @@ final class Relay {
                     String model = info.optString("id");
                     String ref = candidate.id + "/" + model;
                     if (tried.contains(ref) || !Providers.freeModel(candidate, model)) continue;
+                    if (++attempts > 8) break;
                     tried.add(ref);
                     String candidateKey = Secrets.get(c, Providers.secretName(candidate.id));
                     if (candidateKey == null && !Providers.keyless(candidateBase)) continue;
@@ -333,7 +336,6 @@ final class Relay {
                             break;
                         }
                         retry.disconnect();
-                        if (!isContextLimit(retryCode, retryError)) break;
                     } catch (Exception ignored) {
                         if (retry != null) retry.disconnect();
                     }
