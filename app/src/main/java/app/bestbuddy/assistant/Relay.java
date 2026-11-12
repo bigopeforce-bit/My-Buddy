@@ -254,6 +254,12 @@ final class Relay {
         try {
             if (body.length > 0) model = new org.json.JSONObject(new String(body, StandardCharsets.UTF_8)).optString("model", "");
         } catch (Exception ignored) {}
+        String route = parts.length == 3 ? parts[2].toLowerCase(Locale.ROOT) : "";
+        boolean modelRequest = route.contains("chat/completions") || route.endsWith("responses") || route.endsWith("messages");
+        if (modelRequest && model.isEmpty()) {
+            error(out, 403, "BestBuddy requires an explicitly selected, verified free model for inference requests.");
+            return;
+        }
         if (!model.isEmpty() && (p == null || !Providers.freeModel(p, model))) {
             error(out, 403, "BestBuddy is in free-model-only mode. This model is not verified as free and was not sent.");
             return;
