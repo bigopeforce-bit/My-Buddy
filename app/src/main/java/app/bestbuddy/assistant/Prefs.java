@@ -27,6 +27,15 @@ final class Prefs {
         return t;
     }
 
+    /** A per-provider/model sticky fallback selected after a context-window rejection. */
+    static String modelFallback(Context c, String key) {
+        return sp(c).getString("model_fallback_" + key.hashCode(), "");
+    }
+
+    static void setModelFallback(Context c, String key, String model) {
+        sp(c).edit().putString("model_fallback_" + key.hashCode(), model).apply();
+    }
+
     static int[] bubblePos(Context c) {
         return new int[]{sp(c).getInt("bx", -1), sp(c).getInt("by", 400)};
     }
