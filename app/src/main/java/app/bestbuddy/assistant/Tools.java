@@ -152,12 +152,15 @@ final class Tools {
                         + "step did; call read_screen after.",
                 props().put("steps", new JSONObject().put("type", "array").put("minItems", 1).put("maxItems", 12)
                         .put("items", new JSONObject().put("type", "object").put("properties", props()
-                                .put("action", enumProp("tap", "long_press", "type", "scroll", "press", "open_app", "wait"))
+                                .put("action", enumProp("tap", "long_press", "type", "scroll", "swipe", "press", "open_app", "wait"))
                                 .put("element", intProp("Element id from the last read_screen"))
                                 .put("text", strProp("tap/long_press: the target's visible text; type: the text to type"))
                                 .put("target", strProp("type: the field's visible text or hint, instead of element"))
                                 .put("x", intProp("X in screen pixels")).put("y", intProp("Y in screen pixels"))
                                 .put("direction", enumProp("up", "down", "left", "right"))
+                                .put("x1", intProp("swipe: start X")).put("y1", intProp("swipe: start Y"))
+                                .put("x2", intProp("swipe: end X")).put("y2", intProp("swipe: end Y"))
+                                .put("duration_ms", intProp("swipe: duration in milliseconds"))
                                 .put("button", enumProp("back", "home", "recents", "notifications", "quick_settings"))
                                 .put("app", strProp("open_app: the app")).put("ms", intProp("wait: milliseconds"))
                                 .put("append", boolProp("type: append")).put("submit", boolProp("type: press enter/send after"))
@@ -1142,6 +1145,11 @@ final class Tools {
                         a = new JSONObject().put("direction", st.optString("direction", "down"));
                         if (st.has("element")) a.put("element", st.getInt("element"));
                         break;
+                    case "swipe":
+                        a = new JSONObject().put("x1", st.getInt("x1")).put("y1", st.getInt("y1"))
+                                .put("x2", st.getInt("x2")).put("y2", st.getInt("y2"))
+                                .put("duration_ms", st.optLong("duration_ms", 300));
+                        break;
                     case "press":
                         a = new JSONObject().put("button", st.optString("button"));
                         break;
@@ -1177,6 +1185,7 @@ final class Tools {
                         break;
                     }
                     case "scroll": r = scroll(a); break;
+                    case "swipe": r = swipe(a); break;
                     case "press": r = press(a.getString("button")); break;
                     case "open_app": r = openApp(a.getString("app")); break;
                     default: {
