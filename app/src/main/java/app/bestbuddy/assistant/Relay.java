@@ -221,8 +221,9 @@ final class Relay {
                 if (window > 0) break;
             }
             // a free model: the service says so in its pricing (Kilo's gateway: a price of -1)
-            boolean free = id.toLowerCase(Locale.ROOT).endsWith(":free") || m.optBoolean("free", false)
-                    || m.optBoolean("is_free", false);
+            boolean free = id.toLowerCase(Locale.ROOT).endsWith(":free")
+                    || id.toLowerCase(Locale.ROOT).endsWith("/free")
+                    || m.optBoolean("free", false) || m.optBoolean("is_free", false);
             org.json.JSONObject pricing = m.optJSONObject("pricing");
             if (pricing != null) {
                 String prompt = pricing.optString("prompt", "").trim();
@@ -244,147 +245,26 @@ final class Relay {
     static void handle(Context c, String method, String rawPath, Map<String, String> headers, byte[] body,
                        OutputStream out) throws Exception {
         String[] parts = rawPath.substring(PATH.length()).split("/", 3);
-        Providers.P original = parts.length >= 2 ? Providers.find(parts[0]) : null;
+        Providers.P p = parts.length >= 2 ? Providers.find(parts[0]) : null;
         boolean anthropic = parts.length >= 2 && "a".equals(parts[1]);
-        String rest = parts.length == 3 ? "/" + parts[2] : "";
-        if (original == null) { error(out, 404, "Unknown provider."); return; }
-        String originalBase = anthropic ? original.anthropic : "o".equals(parts[1]) ? original.openai : "";
-        if (originalBase.isEmpty()) { error(out, 404, "This provider does not support this API."); return; }
-
-        org.json.JSONObject requestJson = null;
-        String requestedModel = "";
+        String base = p == null ? "" : anthropic ? p.anthropic : "o".equals(parts[1]) ? p.openai : "";
+        String key = p == null ? null : Secrets.get(c, Providers.secretName(p.id));
+        boolean keyless = p != null && Providers.keyless(base);
+        String model = "";
         try {
-            if (body.length > 0) {
-                requestJson = new org.json.JSONObject(new String(body, StandardCharsets.UTF_8));
-                requestedModel = requestJson.optString("model", "");
-            }
+            if (body.length > 0) model = new org.json.JSONObject(new String(body, StandardCharsets.UTF_8)).optString("model", "");
         } catch (Exception ignored) {}
-        if (!requestedModel.isEmpty() && !Providers.freeModel(original, requestedModel)) {
+        if (!model.isEmpty() && !Providers.freeModel(p, model)) {
             error(out, 403, "BestBuddy is in free-model-only mode. This model is not verified as free and was not sent.");
             return;
         }
 
-        String fallbackKey = original.id + "|" + (anthropic ? "a" : "o") + "|" + requestedModel;
-        Providers.P target = original;
-        String targetModel = requestedModel;
-        String sticky = requestedModel.isEmpty() ? "" : Prefs.modelFallback(c, fallbackKey);
-        if (!sticky.isEmpty() && requestJson != null) {
-            int slash = sticky.indexOf('/');
-            if (slash > 0) {
-                Providers.P saved = Providers.find(sticky.substring(0, slash));
-                String savedModel = sticky.substring(slash + 1);
-                String savedBase = saved == null ? "" : anthropic ? saved.anthropic : saved.openai;
-                if (saved != null && !savedBase.isEmpty() && Providers.freeModel(saved, savedModel)) {
-                    target = saved;
-                    targetModel = savedModel;
-                }
-            }
-        }
-
-        String targetBase = anthropic ? target.anthropic : target.openai;
-        String key = Secrets.get(c, Providers.secretName(target.id));
-        boolean keyless = Providers.keyless(targetBase);
-        if ((key == null && !keyless) || targetBase.isEmpty()) {
+        if ((key == null && !keyless) || base.isEmpty()) {
             error(out, 401, "No API key saved in BestBuddy for this service. Add one in BestBuddy's Settings, under API keys.");
             return;
         }
-        if (key == null) key = "";
-        byte[] requestBody = targetModel.equals(requestedModel) ? body : withModel(requestJson, targetModel);
-        HttpURLConnection con = send(targetBase, method, rest, anthropic, key, headers, requestBody);
-        int code = con.getResponseCode();
-        byte[] errorBody = code >= 400 ? readBytes(con.getErrorStream()) : null;
-
-        if (code >= 400 && isContextLimit(code, errorBody) && requestJson != null && !requestedModel.isEmpty()) {
-            // Try other verified-free models, preferring the same provider before other enabled providers.
-            java.util.LinkedHashSet<String> tried = new java.util.LinkedHashSet<>();
-            tried.add(target.id + "/" + targetModel);
-            tried.add(original.id + "/" + requestedModel);
-            java.util.List<Providers.P> candidates = new java.util.ArrayList<>();
-            candidates.add(original);
-            for (Providers.P candidate : Providers.all()) if (candidate != original) candidates.add(candidate);
-            int attempts = 0;
-            for (Providers.P candidate : candidates) {
-                if (Providers.off(c, Providers.apiId(candidate.id))) continue;
-                String candidateBase = anthropic ? candidate.anthropic : candidate.openai;
-                if (candidateBase.isEmpty()) continue;
-                for (int i = 0; i < candidate.offered().length(); i++) {
-                    org.json.JSONObject info = candidate.offered().optJSONObject(i);
-                    if (info == null) continue;
-                    String model = info.optString("id");
-                    String ref = candidate.id + "/" + model;
-                    if (tried.contains(ref) || !Providers.freeModel(candidate, model)) continue;
-                    if (++attempts > 8) break;
-                    tried.add(ref);
-                    String candidateKey = Secrets.get(c, Providers.secretName(candidate.id));
-                    if (candidateKey == null && !Providers.keyless(candidateBase)) continue;
-                    if (candidateKey == null) candidateKey = "";
-                    HttpURLConnection retry = null;
-                    try {
-                        retry = send(candidateBase, method, rest, anthropic, candidateKey, headers,
-                                withModel(requestJson, model));
-                        int retryCode = retry.getResponseCode();
-                        byte[] retryError = retryCode >= 400 ? readBytes(retry.getErrorStream()) : null;
-                        if (retryCode < 400) {
-                            con.disconnect();
-                            con = retry;
-                            code = retryCode;
-                            errorBody = null;
-                            target = candidate;
-                            targetModel = model;
-                            key = candidateKey;
-                            Prefs.setModelFallback(c, fallbackKey, ref);
-                            break;
-                        }
-                        retry.disconnect();
-                    } catch (Exception ignored) {
-                        if (retry != null) retry.disconnect();
-                    }
-                }
-                if (code < 400) break;
-            }
-        }
-
-        StringBuilder responseHeaders = new StringBuilder("HTTP/1.1 ").append(code).append(" Relayed\r\n");
-        for (Map.Entry<String, List<String>> e : con.getHeaderFields().entrySet()) {
-            String n = e.getKey();
-            if (n == null) continue;
-            String lower = n.toLowerCase(Locale.ROOT);
-            if (lower.equals("content-length") || lower.equals("content-encoding") || lower.equals("transfer-encoding")
-                    || lower.equals("connection") || lower.startsWith("x-android")) continue;
-            for (String v : e.getValue()) responseHeaders.append(n).append(": ").append(v).append("\r\n");
-        }
-        responseHeaders.append("Transfer-Encoding: chunked\r\nConnection: close\r\n\r\n");
-        out.write(responseHeaders.toString().getBytes(StandardCharsets.UTF_8));
-        out.flush();
-        try {
-            if (code >= 400) {
-                byte[] said = hideKey(new String(errorBody == null ? new byte[0] : errorBody, StandardCharsets.UTF_8), key)
-                        .getBytes(StandardCharsets.UTF_8);
-                if (said.length > 0) {
-                    out.write((Integer.toHexString(said.length) + "\r\n").getBytes(StandardCharsets.US_ASCII));
-                    out.write(said);
-                    out.write("\r\n".getBytes(StandardCharsets.US_ASCII));
-                    out.flush();
-                }
-            } else {
-                try (InputStream in = con.getInputStream()) {
-                    byte[] buf = new byte[16 * 1024];
-                    int n;
-                    while ((n = in.read(buf)) > 0) {
-                        out.write((Integer.toHexString(n) + "\r\n").getBytes(StandardCharsets.US_ASCII));
-                        out.write(buf, 0, n);
-                        out.write("\r\n".getBytes(StandardCharsets.US_ASCII));
-                        out.flush();
-                    }
-                }
-            }
-        } finally { con.disconnect(); }
-        out.write("0\r\n\r\n".getBytes(StandardCharsets.US_ASCII));
-        out.flush();
-    }
-
-    private static HttpURLConnection send(String base, String method, String rest, boolean anthropic, String key,
-                                          Map<String, String> headers, byte[] body) throws Exception {
+        if (key == null) key = ""; // a service that needs no key (Kilo's free router)
+        String rest = parts.length == 3 ? "/" + parts[2] : "";
         HttpURLConnection con = open(new URL(trim(base) + rest));
         con.setRequestMethod(method);
         con.setConnectTimeout(30_000);
@@ -392,41 +272,58 @@ final class Relay {
         con.setInstanceFollowRedirects(false);
         for (Map.Entry<String, String> h : headers.entrySet()) {
             String n = h.getKey();
+            // the agent's stand-in token and the connection's own headers don't go on
             if (n.equals("authorization") || n.equals("x-api-key") || n.equals("host") || n.equals("content-length")
                     || n.equals("connection") || n.equals("transfer-encoding") || n.equals("accept-encoding")) continue;
             con.setRequestProperty(n, h.getValue());
         }
         if (xApiKey(anthropic, base)) con.setRequestProperty("x-api-key", key);
-        else if (!key.isEmpty()) con.setRequestProperty("Authorization", "Bearer " + key);
+        else if (!key.isEmpty()) con.setRequestProperty("Authorization", "Bearer " + key); // a local server needs none
         if (body.length > 0) {
             con.setDoOutput(true);
             con.setFixedLengthStreamingMode(body.length);
-            try (OutputStream o = con.getOutputStream()) { o.write(body); }
+            try (OutputStream o = con.getOutputStream()) {
+                o.write(body);
+            }
         }
-        return con;
-    }
-
-    private static byte[] withModel(org.json.JSONObject json, String model) throws Exception {
-        org.json.JSONObject copy = new org.json.JSONObject(json.toString());
-        copy.put("model", model);
-        return copy.toString().getBytes(StandardCharsets.UTF_8);
-    }
-
-    private static byte[] readBytes(InputStream in) throws Exception {
-        if (in == null) return new byte[0];
-        try (InputStream source = in; java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream()) {
-            byte[] b = new byte[8192]; int n;
-            while ((n = source.read(b)) > 0 && out.size() < (1 << 20)) out.write(b, 0, n);
-            return out.toByteArray();
+        int code = con.getResponseCode();
+        StringBuilder h = new StringBuilder("HTTP/1.1 ").append(code).append(" Relayed\r\n");
+        for (Map.Entry<String, List<String>> e : con.getHeaderFields().entrySet()) {
+            String n = e.getKey();
+            if (n == null) continue;
+            String l = n.toLowerCase(Locale.ROOT);
+            if (l.equals("content-length") || l.equals("content-encoding") || l.equals("transfer-encoding")
+                    || l.equals("connection") || l.startsWith("x-android")) continue;
+            for (String v : e.getValue()) h.append(n).append(": ").append(v).append("\r\n");
         }
-    }
-
-    private static boolean isContextLimit(int code, byte[] body) {
-        if (code != 400 && code != 413 && code != 422) return false;
-        String s = new String(body == null ? new byte[0] : body, StandardCharsets.UTF_8).toLowerCase(Locale.ROOT);
-        return s.contains("context_length_exceeded") || s.contains("context length") || s.contains("context window")
-                || s.contains("maximum context") || s.contains("too many tokens") || s.contains("prompt is too long")
-                || s.contains("input is too long") || s.contains("token limit");
+        h.append("Transfer-Encoding: chunked\r\nConnection: close\r\n\r\n");
+        out.write(h.toString().getBytes(StandardCharsets.UTF_8));
+        out.flush();
+        // as it arrives: replies stream token by token
+        try (InputStream in = code >= 400 ? con.getErrorStream() : con.getInputStream()) {
+            if (in != null && code >= 400) { // an error may quote the key back, and the agent must never see it
+                byte[] said = hideKey(read(in), key).getBytes(StandardCharsets.UTF_8);
+                if (said.length > 0) {
+                    out.write((Integer.toHexString(said.length) + "\r\n").getBytes(StandardCharsets.US_ASCII));
+                    out.write(said);
+                    out.write("\r\n".getBytes(StandardCharsets.US_ASCII));
+                    out.flush();
+                }
+            } else if (in != null) {
+                byte[] buf = new byte[16 * 1024];
+                int n;
+                while ((n = in.read(buf)) > 0) {
+                    out.write((Integer.toHexString(n) + "\r\n").getBytes(StandardCharsets.US_ASCII));
+                    out.write(buf, 0, n);
+                    out.write("\r\n".getBytes(StandardCharsets.US_ASCII));
+                    out.flush();
+                }
+            }
+        } finally {
+            con.disconnect();
+        }
+        out.write("0\r\n\r\n".getBytes(StandardCharsets.US_ASCII));
+        out.flush();
     }
 
     private static void error(OutputStream out, int code, String message) throws Exception {
