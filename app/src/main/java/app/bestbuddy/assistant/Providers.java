@@ -210,7 +210,7 @@ final class Providers {
 
     static synchronized List<P> forAgent(String agent) {
         List<P> out = new ArrayList<>();
-        for (P p : all()) if (p.fits(agent)) out.add(p);
+        for (P p : all()) if (p.fits(agent) && p.offered().length() > 0) out.add(p);
         return out;
     }
 
@@ -273,6 +273,7 @@ final class Providers {
             JSONObject windows = new JSONObject();
             for (int i = 0; i < p.models.length(); i++) {
                 JSONObject m = p.models.getJSONObject(i);
+                if (!freeModel(p, m)) continue;
                 windows.put(m.getString("id"), new JSONObject().put("name", m.optString("name"))
                         .put("window", m.optLong("window")));
             }
@@ -285,7 +286,7 @@ final class Providers {
 
     private static JSONObject json(P p) throws Exception {
         return new JSONObject().put("id", p.id).put("name", p.name).put("anthropic", p.anthropic).put("openai", p.openai)
-               .put("model", p.model).put("shown", new JSONArray(p.shown));
+               .put("model", freeModel(p, p.model) ? p.model : "").put("shown", new JSONArray(p.shown));
     }
 
     /** Asks the service for its models (OpenAI-style address first: it lists more) and keeps them. */
