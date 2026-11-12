@@ -48,7 +48,7 @@ final class Providers {
         }
 
         String defaultModel() {
-            if (!model.isEmpty() && isFreeId(model)) return model;
+            if (!model.isEmpty() && freeModel(this, model)) return model;
             JSONArray free = offered();
             if (free.length() == 0) return "";
             List<String> chat = chatModels(free);
