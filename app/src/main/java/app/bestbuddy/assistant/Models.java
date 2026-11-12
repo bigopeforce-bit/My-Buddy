@@ -25,10 +25,7 @@ final class Models {
     /** Gemini CLI's models (--model); Auto lets it pick the best Gemini 3 model for the task. */
     static final String[][] GEMINI = {
             {"", "Default"},
-            {"auto", "Auto (Gemini 3)"},
-            {"gemini-3-pro-preview", "Gemini 3 Pro"},
             {"gemini-3-flash-preview", "Gemini 3 Flash"},
-            {"gemini-2.5-pro", "Gemini 2.5 Pro"},
             {"gemini-2.5-flash", "Gemini 2.5 Flash"},
             {"gemini-2.5-flash-lite", "Gemini 2.5 Flash Lite"},
     };
@@ -114,7 +111,7 @@ final class Models {
         if (p == null) return out;
         for (int i = 0; i < p.models.length(); i++) {
             org.json.JSONObject m = p.models.optJSONObject(i);
-            if (m == null) continue;
+            if (m == null || !Providers.freeModel(p, m)) continue;
             String id = m.optString("id");
             String name = m.optString("name");
             out.add(new String[]{id, name.isEmpty() ? id : name});
@@ -215,12 +212,14 @@ final class Models {
     static String agentDefault(String backend) {
         String d = Prefs.agentDefault(BestBuddyApp.context(), backend);
         if (!d.startsWith("@")) {
-            // one of the agent's own models (e.g. kilo-auto/free), or the plain id of a service's model
+            // A plain ID may be a legacy API-service default; never reinterpret a known paid service model as an agent model.
             String s = serviceModel(backend, d);
-            return s == null ? d : s;
+            if (s != null) return s;
+            for (Providers.P provider : Providers.all()) if (provider.modelInfo(d) != null) return "";
+            return d;
         }
         Providers.P p = Providers.of(d);
-        if (p == null || !p.fits(backend)) return "";
+        if (p == null || !p.fits(backend) || !Providers.freeModel(p, Providers.model(d))) return "";
         String m = Providers.model(d);
         return Providers.ref(p, m.isEmpty() ? p.defaultModel() : m);
     }
@@ -256,6 +255,10 @@ final class Models {
             org.json.JSONArray a = new org.json.JSONArray(Prefs.fallbacks(BestBuddyApp.context(), backend));
             for (int i = 0; i < a.length(); i++) {
                 String m = a.optString(i);
+                if (m.startsWith("@")) {
+                    Providers.P provider = Providers.of(m);
+                    if (provider == null || !Providers.freeModel(provider, Providers.model(m))) continue;
+                }
                 if (!m.isEmpty() && !out.contains(m)) out.add(m);
             }
         } catch (Exception ignored) {
@@ -323,8 +326,16 @@ final class Models {
 
     /** OpenCode's models as JSON [[id, name], …] ("provider/model" for both). */
     static void setOpencode(String json) {
-        String[][] m = parse(json);
-        if (m != null) opencodeLive = m;
+        String[][] parsed = parse(json);
+        if (parsed == null) return;
+        java.util.List<String[]> free = new java.util.ArrayList<>();
+        free.add(parsed[0]);
+        for (int i = 1; i < parsed.length; i++) {
+            String id = parsed[i][0].toLowerCase(java.util.Locale.ROOT);
+            if (id.equals("opencode/big-pickle") || id.endsWith(":free") || id.endsWith("/free")) free.add(parsed[i]);
+        }
+        if (free.size() > 1) opencodeLive = free.toArray(new String[0][]);
+        else opencodeLive = null; // retain the known free OpenCode model if no free markers are reported
     }
 
     /** Antigravity's models as JSON [[id, name], …]. */

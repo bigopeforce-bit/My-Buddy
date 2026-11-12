@@ -221,11 +221,16 @@ final class Relay {
                 if (window > 0) break;
             }
             // a free model: the service says so in its pricing (Kilo's gateway: a price of -1)
-            boolean free = false;
+            boolean free = id.toLowerCase(Locale.ROOT).endsWith(":free")
+                    || id.toLowerCase(Locale.ROOT).endsWith("/free")
+                    || m.optBoolean("free", false) || m.optBoolean("is_free", false);
             org.json.JSONObject pricing = m.optJSONObject("pricing");
             if (pricing != null) {
-                String p = pricing.optString("prompt", "");
-                free = "-1".equals(p.trim()) || "0".equals(p.trim());
+                String prompt = pricing.optString("prompt", "").trim();
+                String completion = pricing.optString("completion", "").trim();
+                boolean promptFree = "-1".equals(prompt) || "0".equals(prompt);
+                boolean completionFree = "-1".equals(completion) || "0".equals(completion);
+                free = free || (!prompt.isEmpty() && !completion.isEmpty() && promptFree && completionFree);
             }
             org.json.JSONObject effort = m.optJSONObject("effort");
             org.json.JSONArray levels = effort == null ? null : effort.optJSONArray("supported_levels");
@@ -245,6 +250,21 @@ final class Relay {
         String base = p == null ? "" : anthropic ? p.anthropic : "o".equals(parts[1]) ? p.openai : "";
         String key = p == null ? null : Secrets.get(c, Providers.secretName(p.id));
         boolean keyless = p != null && Providers.keyless(base);
+        String model = "";
+        try {
+            if (body.length > 0) model = new org.json.JSONObject(new String(body, StandardCharsets.UTF_8)).optString("model", "");
+        } catch (Exception ignored) {}
+        String route = parts.length == 3 ? parts[2].toLowerCase(Locale.ROOT) : "";
+        boolean modelRequest = route.contains("chat/completions") || route.endsWith("responses") || route.endsWith("messages");
+        if (modelRequest && model.isEmpty()) {
+            error(out, 403, "BestBuddy requires an explicitly selected, verified free model for inference requests.");
+            return;
+        }
+        if (!model.isEmpty() && (p == null || !Providers.freeModel(p, model))) {
+            error(out, 403, "BestBuddy is in free-model-only mode. This model is not verified as free and was not sent.");
+            return;
+        }
+
         if ((key == null && !keyless) || base.isEmpty()) {
             error(out, 401, "No API key saved in BestBuddy for this service. Add one in BestBuddy's Settings, under API keys.");
             return;

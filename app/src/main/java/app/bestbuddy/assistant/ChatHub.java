@@ -337,7 +337,7 @@ final class ChatHub {
      * the model it switched to, says which one it tried, and runs the same message again with it.
      */
     private void autoSwitch(Sessions.Session ses, String error) {
-        if (!Prefs.autoSwitch(app) || ses.switches >= 3 || ses.scheduledRun) return;
+        if (!Prefs.autoSwitch(app) || ses.switches >= 8 || ses.scheduledRun) return;
         if (!modelFailed(error)) return;
         String now = Models.effective(ses);
         String next = Models.nextFallback(ses.backend, now, ses.triedModels);
@@ -366,6 +366,10 @@ final class ChatHub {
     private static boolean modelFailed(String error) {
         if (error == null || error.isEmpty()) return false;
         String e = error.toLowerCase(java.util.Locale.ROOT);
+        // Context-window rejection is a model-capacity failure even when the provider never says "model".
+        if (e.contains("context_length_exceeded") || e.contains("context window") || e.contains("context length")
+                || e.contains("maximum context") || e.contains("too many tokens") || e.contains("prompt is too long")
+                || e.contains("input is too long") || e.contains("token limit")) return true;
         if (!e.contains("model") && !e.contains("429") && !e.contains("quota") && !e.contains("rate limit")
                 && !e.contains("overloaded") && !e.contains("503") && !e.contains("capacity")) return false;
         return e.matches("(?s).*(model.*(not found|no such|not available|unavailable|does not exist|unknown|invalid"

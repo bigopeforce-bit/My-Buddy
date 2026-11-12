@@ -36,21 +36,25 @@ final class Providers {
             return "opencode".equals(agent) && (!anthropic.isEmpty() || !openai.isEmpty());
         }
 
-        /** The models the pickers offer: the ones picked to show, or all. */
+        /** Only verified free models are exposed to chats and agents. */
         JSONArray offered() {
-            if (shown.isEmpty()) return models;
             JSONArray out = new JSONArray();
             for (int i = 0; i < models.length(); i++) {
                 JSONObject m = models.optJSONObject(i);
-                if (m != null && shown.contains(m.optString("id"))) out.put(m);
+                if (m == null) continue;
+                String id = m.optString("id");
+                if ((!shown.isEmpty() && !shown.contains(id)) || !freeModel(this, m)) continue;
+                out.put(m);
             }
-            return out.length() == 0 ? models : out;
+            return out;
         }
 
         String defaultModel() {
-            if (!model.isEmpty() || models.length() == 0) return model;
-            List<String> chat = chatModels(offered());
-            return chat.isEmpty() ? offered().optJSONObject(0).optString("id") : chat.get(0);
+            if (!model.isEmpty() && freeModel(this, model)) return model;
+            JSONArray free = offered();
+            if (free.length() == 0) return "";
+            List<String> chat = chatModels(free);
+            return chat.isEmpty() ? free.optJSONObject(0).optString("id") : chat.get(0);
         }
 
         JSONObject modelInfo(String m) {
@@ -69,19 +73,34 @@ final class Providers {
 
     /** Presets for the editor: name, Anthropic-style address, OpenAI-style address, Chat Completions only. */
     static final String[][] PRESETS = {
-            {"DeepSeek", "https://api.deepseek.com/anthropic", "https://api.deepseek.com", ""},
-            {"OpenRouter", "https://openrouter.ai/api", "https://openrouter.ai/api/v1", "chat"},
-            {"Anthropic", "https://api.anthropic.com", "", ""},
-            {"OpenAI", "", "https://api.openai.com/v1", ""},
+            {"OpenRouter (free models)", "https://openrouter.ai/api", "https://openrouter.ai/api/v1", "chat"},
             // Kilo Gateway: one address for many models, among them the free router "kilo-auto/free"
-            {"Kilo", "", "https://api.kilo.ai/api/gateway/v1", ""},
+            {"Kilo (free router)", "", "https://api.kilo.ai/api/gateway/v1", "chat"},
             // your own server: on this phone as given, or on a PC with its address on your network instead of localhost
-            {"Ollama", "", "http://localhost:11434/v1", ""},
-            // BestBuddy-managed FreeLLMAPI router (one unified key for its configured upstream providers)
-            {"FreeLLMAPI", "", "http://127.0.0.1:3001/v1", "chat"},
-            {"LM Studio", "", "http://localhost:1234/v1", ""},
-            {"llama.cpp", "", "http://localhost:8080/v1", ""},
+            {"Ollama (local)", "", "http://localhost:11434/v1", ""},
+            // BestBuddy-managed gateway: only models whose API metadata confirms free pricing are exposed.
+            {"FreeLLMAPI (free models only)", "", "http://127.0.0.1:3001/v1", "chat"},
+            {"LM Studio (local)", "", "http://localhost:1234/v1", ""},
+            {"llama.cpp (local)", "", "http://localhost:8080/v1", ""},
     };
+
+    static boolean isFreeId(String id) {
+        return id != null && (id.toLowerCase(java.util.Locale.ROOT).endsWith(":free")
+                || id.toLowerCase(java.util.Locale.ROOT).endsWith("/free"));
+    }
+
+    /** Free only when metadata confirms it, the route is explicitly free, or the endpoint is local. */
+    static boolean freeModel(P provider, JSONObject model) {
+        if (model == null) return false;
+        if (isLocal(provider.openai.isEmpty() ? provider.anthropic : provider.openai)) return true;
+        return model.optBoolean("free", false) || isFreeId(model.optString("id"));
+    }
+
+    static boolean freeModel(P provider, String modelId) {
+        if (isLocal(provider.openai.isEmpty() ? provider.anthropic : provider.openai)) return true;
+        JSONObject info = provider.modelInfo(modelId);
+        return info != null && freeModel(provider, info);
+    }
 
     /**
      * An address on this phone or on the user's own network (private IPv4 ranges, Tailscale's 100.64/10, *.local):
@@ -194,7 +213,7 @@ final class Providers {
 
     static synchronized List<P> forAgent(String agent) {
         List<P> out = new ArrayList<>();
-        for (P p : all()) if (p.fits(agent)) out.add(p);
+        for (P p : all()) if (p.fits(agent) && p.offered().length() > 0) out.add(p);
         return out;
     }
 
@@ -257,6 +276,7 @@ final class Providers {
             JSONObject windows = new JSONObject();
             for (int i = 0; i < p.models.length(); i++) {
                 JSONObject m = p.models.getJSONObject(i);
+                if (!freeModel(p, m)) continue;
                 windows.put(m.getString("id"), new JSONObject().put("name", m.optString("name"))
                         .put("window", m.optLong("window")));
             }
@@ -269,7 +289,7 @@ final class Providers {
 
     private static JSONObject json(P p) throws Exception {
         return new JSONObject().put("id", p.id).put("name", p.name).put("anthropic", p.anthropic).put("openai", p.openai)
-               .put("model", p.model).put("shown", new JSONArray(p.shown));
+               .put("model", freeModel(p, p.model) ? p.model : "").put("shown", new JSONArray(p.shown));
     }
 
     /** Asks the service for its models (OpenAI-style address first: it lists more) and keeps them. */
@@ -277,6 +297,10 @@ final class Providers {
         String key = Secrets.get(c, secretName(p.id));
         if (key == null && !keyless(p.openai.isEmpty() ? p.anthropic : p.openai)) return;
         p.models = list(key == null ? "" : key, p.anthropic, p.openai);
+        String endpoint = p.openai.isEmpty() ? p.anthropic : p.openai;
+        if (isLocal(endpoint)) {
+            for (int i = 0; i < p.models.length(); i++) p.models.optJSONObject(i).put("free", true);
+        }
         store(c);
     }
 
