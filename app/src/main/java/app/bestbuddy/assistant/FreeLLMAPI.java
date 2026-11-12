@@ -28,10 +28,9 @@ final class FreeLLMAPI {
 
     static boolean installed(Context c) {
         if (!Linux.installed(c)) return false;
-        try {
-            String out = Linux.exec(c, "test -f " + DIR + "/server/dist/index.js && test -f " + DIR + "/.env", 10);
-            return out.contains("[exit 0]");
-        } catch (Exception e) { return false; }
+        File root = Linux.root(c);
+        return new File(root, "root/.bestbuddy/freellmapi/server/dist/index.js").isFile()
+                && new File(root, "root/.bestbuddy/freellmapi/.env").isFile();
     }
 
     static boolean running() {
