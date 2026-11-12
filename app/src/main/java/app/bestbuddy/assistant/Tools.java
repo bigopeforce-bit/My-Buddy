@@ -143,7 +143,7 @@ final class Tools {
                 until.getJSONObject("properties")));
         t.put(tool("do_steps",
                 "Do several phone actions in one call, when you already know them (fill in a form: tap a field, type, "
-                        + "tap the next one…). Each step is {\"action\": tap | long_press | type | scroll | press | "
+                        + "tap the next one…). Each step is {\"action\": tap | long_press | type | scroll | swipe | press | "
                         + "open_app | wait, and its arguments as in that tool}; a step can name its target by \"text\" "
                         + "(its visible text or description) instead of an element id, which is surer once the screen has "
                         + "changed. Optional \"until\" on a step waits for something after it (as in wait_for). The same "
