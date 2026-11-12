@@ -227,8 +227,9 @@ final class Relay {
             if (pricing != null) {
                 String prompt = pricing.optString("prompt", "").trim();
                 String completion = pricing.optString("completion", "").trim();
-                free = free || "-1".equals(prompt) || "0".equals(prompt)
-                        || "-1".equals(completion) || "0".equals(completion);
+                boolean promptFree = "-1".equals(prompt) || "0".equals(prompt);
+                boolean completionFree = "-1".equals(completion) || "0".equals(completion);
+                free = free || (!prompt.isEmpty() && !completion.isEmpty() && promptFree && completionFree);
             }
             org.json.JSONObject effort = m.optJSONObject("effort");
             org.json.JSONArray levels = effort == null ? null : effort.optJSONArray("supported_levels");
