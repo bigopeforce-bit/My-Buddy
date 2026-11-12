@@ -85,7 +85,8 @@ final class Providers {
     };
 
     static boolean isFreeId(String id) {
-        return id != null && id.toLowerCase(java.util.Locale.ROOT).endsWith(":free");
+        return id != null && (id.toLowerCase(java.util.Locale.ROOT).endsWith(":free")
+                || id.toLowerCase(java.util.Locale.ROOT).endsWith("/free"));
     }
 
     /** Free only when metadata confirms it, the route is explicitly free, or the endpoint is local. */
