@@ -62,13 +62,13 @@ final class Tools {
                         + "a tap there would land on something else. A toast that just showed is listed at the end.",
                 props()));
         t.put(tool("tap",
-                "Tap an element (by id from the last read_screen) or a screen coordinate in pixels. The result says NOTHING CHANGED "
+                "Tap an element by a fresh read_screen id, its visible text/content description, or a screen coordinate from a screenshot. The result says NOTHING CHANGED "
                         + "when the screen reads the same afterwards, and an element under another window isn't tapped.",
                 props().put("element", intProp("Element id from read_screen"))
                         .put("text", strProp("Visible text or content description to tap when no fresh element id is available"))
                         .put("x", intProp("X in screen pixels")).put("y", intProp("Y in screen pixels"))));
         t.put(tool("long_press",
-                "Press and hold an element (by id from the last read_screen) or a screen coordinate in pixels, for "
+                "Press and hold an element by a fresh read_screen id, its visible text/content description, or a screen coordinate, for "
                         + "about 0.7 s. Use it for what apps put behind a long press: a message's or item's menu (reply, "
                         + "copy, delete, react), selecting items or text, moving icons. Use tap for normal taps. Returns "
                         + "\"Long-pressed\" and where; call read_screen to see the menu or selection it opened.",
@@ -77,7 +77,7 @@ final class Tools {
                         .put("x", intProp("X in screen pixels, when there's no element id"))
                         .put("y", intProp("Y in screen pixels, when there's no element id"))));
         t.put(tool("type_text",
-                "Type into the focused text field (or the given element). Replaces its content unless append is true. "
+                "Type into the focused text field or a field identified by element id or visible target label/hint. Replaces its content unless append is true. "
                         + "Set submit to press the keyboard's enter/send action afterwards.",
                 props().put("text", strProp("Text to type"))
                         .put("element", intProp("Optional element id of the text field"))
@@ -124,7 +124,7 @@ final class Tools {
                         + "\"Opened\"; call read_screen to see it.",
                 props().put("url", strProp("The URL or deep link, e.g. https://example.com or tel:+491234")), "url"));
         t.put(tool("screenshot",
-                "Take a screenshot (JPEG). Use only when read_screen is not enough (images, games, canvas UIs). "
+                "Take a screenshot (JPEG). Use detail=high for small controls or fine visual content; standard is lighter. Use when read_screen is not enough (images, games, canvas UIs). "
                         + "The reply says how to convert image coordinates to screen pixels.",
                 props().put("detail", enumProp("standard", "high"))));
         t.put(tool("wait", "Wait for the UI to settle, up to 10000 ms. To wait for something to happen, wait_for is "
