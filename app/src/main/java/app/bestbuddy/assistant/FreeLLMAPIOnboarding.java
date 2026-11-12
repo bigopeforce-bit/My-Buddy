@@ -70,7 +70,7 @@ final class FreeLLMAPIOnboarding {
                 token);
         if (added.has("error")) throw new IllegalStateException(added.optJSONObject("error").optString("message", "Provider key was rejected."));
 
-        String command = "cd /root/.bestbuddy/freellmapi && set -a && . ./.env && set +a && node --input-type=module -e 'import {getUnifiedApiKey} from \"./server/dist/db/index.js\"; console.log(getUnifiedApiKey())'";
+        String command = "cd /root/.bestbuddy/freellmapi && set -a && . ./.env && set +a && node --input-type=module -e 'import {initDb, getUnifiedApiKey} from \"./server/dist/db/index.js\"; initDb(); console.log(getUnifiedApiKey())'";
         String output = Linux.exec(c, command, 30);
         if (!output.contains("[exit 0]")) throw new IllegalStateException("Provider saved, but BestBuddy could not retrieve the local unified key: " + tail(output));
         String unified = "";
