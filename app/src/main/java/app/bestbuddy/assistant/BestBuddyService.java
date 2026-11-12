@@ -584,7 +584,19 @@ public class BestBuddyService extends AccessibilityService implements McpServer.
             return;
         }
         if (getPackageName().equals(foregroundPkg()) || onlyRuleRuns()) return;
+        if (backgroundRunActive()) {
+            // Keep the task alive while the user is active, but never let an action use stale element IDs/coordinates.
+            // The agent must take a fresh screen snapshot before its next mutating phone action.
+            rereadNeeded = true;
+            return;
+        }
         autoPause(R.string.service_autopaused_touch);
+    }
+
+    /** Whether a running chat explicitly opted to continue while the user uses other apps. */
+    private boolean backgroundRunActive() {
+        for (Sessions.Session s : ChatHub.get(this).sessions.all) if (s.running && s.background) return true;
+        return false;
     }
 
     /** Agents waiting for the user to confirm an install (wait_for_install, update_buddy): touches are theirs. */
