@@ -350,12 +350,12 @@ final class ChatHub {
         add(ses, Bubble.Kind.STEP, app.getString(R.string.hub_model_switched, Models.label(ses.backend, now),
                 Models.label(ses.backend, next)));
         String last = lastMessage(ses);
-        if (!last.isEmpty()) {
+        List<String> previousFiles = lastMessageFiles(ses);
+        if (!last.isEmpty() || !previousFiles.isEmpty()) {
             try {
                 // The old native session may have hit its context limit. Start a clean agent session and
                 // rehydrate it from BestBuddy's saved transcript so the fallback model sees the conversation.
                 String handoff = handoffPrompt(ses);
-                List<String> previousFiles = lastMessageFiles(ses);
                 Helper.run(app, "ask", ses.id, ses.backend, devArg(ses), handoff, runModel(ses),
                         previousFiles.isEmpty() ? "" : android.text.TextUtils.join(",", previousFiles), ses.effort, "1");
                 startRun(ses);
