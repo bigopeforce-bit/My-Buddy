@@ -355,7 +355,9 @@ final class ChatHub {
                 // The old native session may have hit its context limit. Start a clean agent session and
                 // rehydrate it from BestBuddy's saved transcript so the fallback model sees the conversation.
                 String handoff = handoffPrompt(ses);
-                Helper.run(app, "ask", ses.id, ses.backend, devArg(ses), handoff, runModel(ses), "", ses.effort, "1");
+                List<String> previousFiles = lastMessageFiles(ses);
+                Helper.run(app, "ask", ses.id, ses.backend, devArg(ses), handoff, runModel(ses),
+                        previousFiles.isEmpty() ? "" : android.text.TextUtils.join(",", previousFiles), ses.effort, "1");
                 startRun(ses);
                 ses.status = app.getString(R.string.hub_thinking);
             } catch (Exception e) {
@@ -420,6 +422,15 @@ final class ChatHub {
         if (lastUser > 0 && history.length() == 0) prompt.append("[Earlier conversation exists but was too large to include in this context.]\n");
         prompt.append("Current user message:\n").append(last);
         return prompt.toString();
+    }
+
+    /** Attachments belonging to the current user turn, so a fallback model receives them too. */
+    private List<String> lastMessageFiles(Sessions.Session ses) {
+        for (int i = ses.messages.size() - 1; i >= 0; i--) {
+            Sessions.Msg m = ses.messages.get(i);
+            if (m.kind == Bubble.Kind.USER) return new ArrayList<>(m.files);
+        }
+        return new ArrayList<>();
     }
 
     /** The user's last message in the chat (the one to run again with another model). */
