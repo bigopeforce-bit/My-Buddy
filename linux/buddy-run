@@ -365,9 +365,12 @@ if [ "${FRESH:-}" = 1 ] && [ -n "$SVC" ]; then
   HISTORY="${MSG%$marker*}"
   CURRENT="${MSG##*$marker}"
   if [ "$HISTORY" != "$MSG" ] && [ -n "$HISTORY" ]; then
+    event buddy_step "Updating conversation memory with the selected free model…"
     SUMMARY=$(model_summary "$HISTORY" 2>/dev/null) || SUMMARY=""
     if [ -n "$SUMMARY" ]; then
       MSG=$(printf 'Model-generated conversation memory (updated from the saved transcript):\n%s\n\nRecent exact context from the transcript:\n%s\n\nCurrent user message:\n%s' "$SUMMARY" "$(printf '%s' "$HISTORY" | tail -c 12000)" "$CURRENT")
+    else
+      event buddy_step "Model summary was unavailable; continuing with the saved transcript excerpt."
     fi
   fi
 fi
