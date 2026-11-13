@@ -359,10 +359,10 @@ fi
 
 # On a fresh provider session, replace the long raw history with a model-generated cumulative memory.
 # The current user turn remains verbatim, and the latest transcript tail is kept for exact wording.
-if [ "\${FRESH:-}" = 1 ] && [ -n "$SVC" ]; then
+if [ "${FRESH:-}" = 1 ] && [ -n "$SVC" ]; then
   marker=$'\nCurrent user message:\n'
-  HISTORY="\${MSG%$marker*}"
-  CURRENT="\${MSG##*$marker}"
+  HISTORY="${MSG%$marker*}"
+  CURRENT="${MSG##*$marker}"
   if [ "$HISTORY" != "$MSG" ] && [ -n "$HISTORY" ]; then
     SUMMARY=$(model_summary "$HISTORY" 2>/dev/null) || SUMMARY=""
     if [ -n "$SUMMARY" ]; then
