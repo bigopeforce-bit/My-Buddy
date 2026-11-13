@@ -261,6 +261,13 @@ final class ChatHub {
         if (text.isEmpty() && !hasFiles) return null;
         String forAgent = prompt != null ? prompt : text.isEmpty() && hasFiles ? "Have a look at what I attached." : text;
         boolean handoff = ses.handoffPending && !scheduled && !rule && prompt == null && !ses.messages.isEmpty();
+        // A new user turn starts a fresh retry budget; failed models remain excluded throughout
+        // all retries for the current turn, including recursive provider handoffs.
+        if (!handoff && !scheduled && !rule && prompt == null) {
+            ses.switches = 0;
+            ses.triedModels.clear();
+            sessions.save(ses);
+        }
         if (handoff) {
             forAgent = handoffPrompt(ses, forAgent, files, true);
         }
@@ -390,8 +397,16 @@ final class ChatHub {
         if (e.contains("context_length_exceeded") || e.contains("context window") || e.contains("context length")
                 || e.contains("maximum context") || e.contains("too many tokens") || e.contains("prompt is too long")
                 || e.contains("input is too long") || e.contains("token limit")) return true;
+        // OpenCode emits this exact plain-language response when its shared free allowance is exhausted.
+        // Treat it as a provider quota failure even though the text contains neither "model" nor an HTTP code.
+        if (e.contains("free usage limit reached") || e.contains("usage limit reached")
+                || e.contains("free tier limit") || e.contains("free quota exhausted")
+                || e.contains("quota exceeded") || e.contains("daily limit reached")
+                || e.contains("weekly limit reached") || e.contains("billing limit")
+                || e.contains("out of credits") || e.contains("insufficient credits")) return true;
         if (!e.contains("model") && !e.contains("429") && !e.contains("quota") && !e.contains("rate limit")
-                && !e.contains("overloaded") && !e.contains("503") && !e.contains("capacity")) return false;
+                && !e.contains("overloaded") && !e.contains("503") && !e.contains("capacity")
+                && !e.contains("usage limit") && !e.contains("free tier") && !e.contains("credits")) return false;
         return e.matches("(?s).*(model.*(not found|no such|not available|unavailable|does not exist|unknown|invalid"
                 + "|not supported|not allowed|no access|expired|removed|disabled)"
                 + "|(429|quota|rate limit|overloaded|503|capacity|temporarily unavailable)).*");
