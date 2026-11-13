@@ -225,7 +225,8 @@ final class Sessions {
 
     void add(Session s, Bubble.Kind kind, String text, List<String> files) {
         s.messages.add(new Msg(kind, text, files));
-        while (s.messages.size() > MAX_MESSAGES) s.messages.remove(0);
+        // Keep the complete transcript. Trimming here silently discarded older conversation context
+        // and made it unavailable to the chat UI, backups, and later model turns.
         s.updated = System.currentTimeMillis();
         if (kind == Bubble.Kind.USER && s.title.isEmpty()) s.title = autoTitle(text, files);
         // keep most recently used first
