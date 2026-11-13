@@ -283,7 +283,7 @@ model_summary() {
   while IFS= read -r chunk || [ -n "$chunk" ]; do
     [ -n "$chunk" ] || continue
     system="You maintain durable memory for a long-running assistant conversation. Update the existing cumulative summary using the new chronological transcript segment. Preserve concrete facts, preferences, project names, decisions, constraints, technical details, errors, unresolved tasks and next steps. Distinguish confirmed facts from proposals. Do not invent information. Remove repetition. Return only compact structured Markdown."
-    prompt="Existing cumulative summary:\n${previous:-[No summary yet]}\n\nNew chronological transcript segment:\n$chunk"
+    prompt=$(printf 'Existing cumulative summary:\n%s\n\nNew chronological transcript segment:\n%s' "${previous:-[No summary yet]}" "$chunk")
     response=""
     if [ -n "$openai" ]; then
       jq -cn --arg m "$SVCM" --arg sys "$system" --arg p "$prompt" \
@@ -367,7 +367,7 @@ if [ "${FRESH:-}" = 1 ] && [ -n "$SVC" ]; then
   if [ "$HISTORY" != "$MSG" ] && [ -n "$HISTORY" ]; then
     SUMMARY=$(model_summary "$HISTORY" 2>/dev/null) || SUMMARY=""
     if [ -n "$SUMMARY" ]; then
-      MSG="Model-generated conversation memory (updated from the saved transcript):\n$SUMMARY\n\nRecent exact context from the transcript:\n$(printf '%s' "$HISTORY" | tail -c 12000)\n\nCurrent user message:\n$CURRENT"
+      MSG=$(printf 'Model-generated conversation memory (updated from the saved transcript):\n%s\n\nRecent exact context from the transcript:\n%s\n\nCurrent user message:\n%s' "$SUMMARY" "$(printf '%s' "$HISTORY" | tail -c 12000)" "$CURRENT")
     fi
   fi
 fi
