@@ -262,12 +262,23 @@ svc_window() {
 # Model-written cumulative memory for provider handoffs. The Android relay keeps the real key private
 # and enforces BestBuddy's verified-free-model restriction on every summarization request.
 model_summary() {
-  local source="$1" openai anthropic chunk previous="" response="" tmp req system prompt
+  local source="$1" openai anthropic chunk previous="" response="" tmp req system prompt source_delta old_source
   [ -n "$SVC" ] && [ -s "$D/providers/$SVC.json" ] || return 1
   openai=$(jq -r '.openai // ""' "$D/providers/$SVC.json" 2>/dev/null)
   anthropic=$(jq -r '.anthropic // false' "$D/providers/$SVC.json" 2>/dev/null)
   [ -n "$openai" ] || [ "$anthropic" = true ] || return 1
   tmp="$S/summary-response.json"; req="$S/summary-request.json"
+  old_source="$S/summary-source.txt"
+  source_delta="$source"
+  if [ -s "$old_source" ] && [ -s "$S/rolling-summary.md" ]; then
+    local old
+    old=$(cat "$old_source")
+    if [[ "$source" == "$old"* ]]; then
+      previous=$(cat "$S/rolling-summary.md")
+      source_delta="${source:${#old}}"
+      if [ -z "$source_delta" ]; then printf '%s' "$previous"; return 0; fi
+    fi
+  fi
   while IFS= read -r chunk || [ -n "$chunk" ]; do
     [ -n "$chunk" ] || continue
     system="You maintain durable memory for a long-running assistant conversation. Update the existing cumulative summary using the new chronological transcript segment. Preserve concrete facts, preferences, project names, decisions, constraints, technical details, errors, unresolved tasks and next steps. Distinguish confirmed facts from proposals. Do not invent information. Remove repetition. Return only compact structured Markdown."
@@ -297,9 +308,10 @@ model_summary() {
     fi
     [ -n "$response" ] || return 1
     previous="$response"
-  done < <(printf '%s' "$source" | fold -s -w 18000)
+  done < <(printf '%s' "$source_delta" | fold -s -w 18000)
   [ -n "$previous" ] || return 1
   printf '%s\n' "$previous" > "$S/rolling-summary.md"
+  printf '%s' "$source" > "$old_source"
   printf '%s' "$previous"
 }
 
