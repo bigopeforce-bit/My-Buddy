@@ -7,6 +7,7 @@
 #   run.sh --update   rewrite the expected files from the current helper (check the diff before committing)
 set -u
 cd "$(dirname "$0")" || exit 2
+bash -n ../buddy-run || { echo "buddy-run has a shell syntax error"; exit 1; }
 H=$(mktemp -d)
 trap 'rm -rf "$H"' EXIT
 # buddy-run sets its own PATH (Alpine's), which has $HOME/bin first: the tools it uses go there, wherever they are here
