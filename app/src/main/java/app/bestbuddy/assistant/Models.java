@@ -193,8 +193,10 @@ final class Models {
             }
             for (Providers.P q : Providers.enabled()) {
                 if (q.id.equals(p.id) || !q.fits(backend)) continue;
-                java.util.List<String[]> m = providerModels(Providers.apiId(q.id));
-                if (!m.isEmpty()) return Providers.ref(q, m.get(0)[0]);
+                for (String[] candidate : providerModels(Providers.apiId(q.id))) {
+                    String ref = Providers.ref(q, candidate[0]);
+                    if (tried == null || !tried.contains(ref)) return ref;
+                }
             }
             return "";
         }
@@ -204,6 +206,16 @@ final class Models {
         int k = own.indexOf(current);
         for (int j = k + 1; j < own.size(); j++) {
             if (!own.get(j).isEmpty() && (tried == null || !tried.contains(own.get(j)))) return own.get(j);
+        }
+        // If the built-in agent's free pool is exhausted (notably OpenCode's free quota),
+        // continue through enabled API services. providerModels() exposes only metadata-verified
+        // free models; Providers.enabled() excludes providers disabled by the user.
+        for (Providers.P q : Providers.enabled()) {
+            if (!q.fits(backend)) continue;
+            for (String[] candidate : providerModels(Providers.apiId(q.id))) {
+                String ref = Providers.ref(q, candidate[0]);
+                if (!ref.equals(current) && (tried == null || !tried.contains(ref))) return ref;
+            }
         }
         return "";
     }
