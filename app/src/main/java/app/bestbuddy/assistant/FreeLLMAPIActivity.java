@@ -51,7 +51,8 @@ public class FreeLLMAPIActivity extends Screen {
         keyInput = new EditText(this);
         keyInput.setSingleLine(true);
         keyInput.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD);
-        keyInput.setHint("Paste API key here");
+        boolean hasSavedKey = Secrets.get(this, Providers.secretName("freellmapi")) != null;
+        keyInput.setHint(hasSavedKey ? "Enter a new key to replace the saved key" : "Paste API key here");
         keyInput.setTextColor(TEXT);
         keyInput.setHintTextColor(MUTED);
         keyInput.setPadding(dp(this, 14), dp(this, 12), dp(this, 14), dp(this, 12));
@@ -61,7 +62,7 @@ public class FreeLLMAPIActivity extends Screen {
         providerChoice = new Spinner(this);
         providerChoice.setAdapter(new ArrayAdapter<String>(this, android.R.layout.simple_spinner_dropdown_item, PROVIDER_NAMES));
         body.addView(providerChoice, gap(8));
-        connect = button(this, "Connect key automatically", true);
+        connect = button(this, hasSavedKey ? "Save / replace API key" : "Connect key automatically", true);
         body.addView(connect, gap(10));
 
         install = button(this, "Install / Start FreeLLMAPI", false);
