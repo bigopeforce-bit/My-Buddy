@@ -240,7 +240,7 @@ case "$CMD" in
       rm -rf "${d:?}"
     done
     exit 0 ;;
-  ask) SID=${3:-}; BACKEND=${4:-claude}; DEV=${5:-0}; MSG=${6:-}; MODEL=${7:-}; FILES=${8:-}; EFFORT=${9:-}
+  ask) SID=${3:-}; BACKEND=${4:-claude}; DEV=${5:-0}; MSG=${6:-}; MODEL=${7:-}; FILES=${8:-}; EFFORT=${9:-}; FRESH=${10:-}
     [[ "$EFFORT" =~ ^(low|medium|high|xhigh|max)$ ]] || EFFORT="" ;;
   *) echo "usage: buddy-run <token> ask|stop|delete|prune|ping ..." >&2; exit 2 ;;
 esac
@@ -260,6 +260,10 @@ svc_window() {
 }
 S=$D/sessions/$SID
 mkdir -p "$S"
+# A model handoff starts a fresh native agent session, while retaining Buddy's canonical transcript.
+if [ "${FRESH:-}" = 1 ]; then
+  rm -f "$S/claude-session" "$S/codex-thread" "$S/opencode-session" "$S/agy-conversation" "$S/grok-session" "$S/gemini-session"
+fi
 event() { jq -cn --arg type "$1" --arg text "${2:-}" --arg s "$SID" '{type:$type,text:$text,buddy_session:$s}' | post; }
 tag() { jq -c --arg s "$SID" '. + {buddy_session:$s}' 2>/dev/null; }
 
