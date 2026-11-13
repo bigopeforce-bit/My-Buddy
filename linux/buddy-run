@@ -258,6 +258,51 @@ fi
 svc_window() {
   jq -r --arg m "$SVCM" '.models[$m].window // 0 | select(. > 0)' "$D/providers/$SVC.json" 2>/dev/null
 }
+
+# Model-written cumulative memory for provider handoffs. The Android relay keeps the real key private
+# and enforces BestBuddy's verified-free-model restriction on every summarization request.
+model_summary() {
+  local source="$1" openai anthropic chunk previous="" response="" tmp req system prompt
+  [ -n "$SVC" ] && [ -s "$D/providers/$SVC.json" ] || return 1
+  openai=$(jq -r '.openai // ""' "$D/providers/$SVC.json" 2>/dev/null)
+  anthropic=$(jq -r '.anthropic // false' "$D/providers/$SVC.json" 2>/dev/null)
+  [ -n "$openai" ] || [ "$anthropic" = true ] || return 1
+  tmp="$S/summary-response.json"; req="$S/summary-request.json"
+  while IFS= read -r chunk || [ -n "$chunk" ]; do
+    [ -n "$chunk" ] || continue
+    system="You maintain durable memory for a long-running assistant conversation. Update the existing cumulative summary using the new chronological transcript segment. Preserve concrete facts, preferences, project names, decisions, constraints, technical details, errors, unresolved tasks and next steps. Distinguish confirmed facts from proposals. Do not invent information. Remove repetition. Return only compact structured Markdown."
+    prompt="Existing cumulative summary:\n${previous:-[No summary yet]}\n\nNew chronological transcript segment:\n$chunk"
+    response=""
+    if [ -n "$openai" ]; then
+      jq -cn --arg m "$SVCM" --arg sys "$system" --arg p "$prompt" \
+        '{model:$m,temperature:0.1,max_tokens:3000,messages:[{role:"system",content:$sys},{role:"user",content:$p}]}' > "$req"
+      curl -sS -m 180 -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
+        --data-binary @"$req" "$URL/llm/$SVC/o/chat/completions" -o "$tmp" 2>/dev/null || true
+      response=$(jq -r '.choices[0].message.content // empty' "$tmp" 2>/dev/null)
+      if [ -z "$response" ]; then
+        jq -cn --arg m "$SVCM" --arg sys "$system" --arg p "$prompt" \
+          '{model:$m,max_output_tokens:3000,input:[{role:"system",content:[{type:"input_text",text:$sys}]},{role:"user",content:[{type:"input_text",text:$p}]}]}' > "$req"
+        curl -sS -m 180 -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
+          --data-binary @"$req" "$URL/llm/$SVC/o/responses" -o "$tmp" 2>/dev/null || true
+        response=$(jq -r '.output_text // ([.output[]?.content[]? | select(.type == "output_text") | .text] | join("\n"))' "$tmp" 2>/dev/null)
+      fi
+    fi
+    if [ -z "$response" ] && [ "$anthropic" = true ]; then
+      jq -cn --arg m "$SVCM" --arg sys "$system" --arg p "$prompt" \
+        '{model:$m,max_tokens:3000,temperature:0.1,system:$sys,messages:[{role:"user",content:$p}]}' > "$req"
+      curl -sS -m 180 -H "Authorization: Bearer $TOKEN" -H 'anthropic-version: 2023-06-01' \
+        -H 'Content-Type: application/json' --data-binary @"$req" \
+        "$URL/llm/$SVC/a/v1/messages" -o "$tmp" 2>/dev/null || true
+      response=$(jq -r '[.content[]? | select(.type == "text") | .text] | join("\n")' "$tmp" 2>/dev/null)
+    fi
+    [ -n "$response" ] || return 1
+    previous="$response"
+  done < <(printf '%s' "$source" | fold -s -w 18000)
+  [ -n "$previous" ] || return 1
+  printf '%s\n' "$previous" > "$S/rolling-summary.md"
+  printf '%s' "$previous"
+}
+
 S=$D/sessions/$SID
 mkdir -p "$S"
 # A model handoff starts a fresh native agent session, while retaining Buddy's canonical transcript.
@@ -297,6 +342,817 @@ if [ -n "${FILES:-}" ]; then
 
 [The user attached $( [ ${#ATT[@]} -eq 1 ] && echo "a file" || echo "${#ATT[@]} files" ), saved on this phone. Open them with your Read tool (images show as pictures):
 $(printf -- '- %s\n' "${ATT[@]}")]"
+  fi
+fi
+
+# On a fresh provider session, replace the long raw history with a model-generated cumulative memory.
+# The current user turn remains verbatim, and the latest transcript tail is kept for exact wording.
+if [ "${FRESH:-}" = 1 ] && [ -n "$SVC" ]; then
+  marker=
+[ -n "$PERMS" ] && SYSTEM="$SYSTEM
+
+$PERMS"
+# the background browser (Settings): its tools and when to use them, while it is on; never in a rule run
+BROWSER=0
+[ -e "$D/browser-on" ] && [ "$DEV" != rule ] && BROWSER=1
+[ "$BROWSER" = 1 ] && SYSTEM="$SYSTEM
+
+$(cat "$D/browser-prompt.md" 2>/dev/null)"
+if [ "$DEV" = 1 ]; then
+  SYSTEM="$SYSTEM
+
+Linux tools are ON in this chat: you may run shell commands and create or edit files. Work inside $W (one folder per project).
+Before building an Android app, read the android-app skill (Claude Code) or AGENTS.md (Codex, OpenCode, Antigravity, Grok) in $W and follow it."
+  # Settings, GitHub: git and gh are signed in to the user account
+  [ -s "$HOME/.config/gh/hosts.yml" ] && SYSTEM="$SYSTEM
+git and the GitHub CLI (gh) are signed in to the user's GitHub account: you can clone, commit, push and open pull requests.
+Pushing, creating a repository, and opening an issue or pull request are outward-facing: call confirm first with what you will do."
+elif [ "$DEV" = 0 ]; then
+  SYSTEM="$SYSTEM
+
+Linux tools are off in this chat: no shell commands or file edits. If the user asks for something that needs them
+(building an app, running commands), tell them to turn on Linux tools with the chip under this chat's title, then ask again."
+fi
+
+# Buddy's shared skills (Settings, Skills) live in ~/.agents/skills, where Codex and OpenCode look. Gemini CLI reads
+# its own ~/.gemini/skills and Claude Code ~/.claude/skills: each gets a link to every skill (one already there wins),
+# and links to removed ones go.
+link_skills() {
+  local d n l dir
+  for dir in "$HOME/.claude/skills" "$HOME/.gemini/skills"; do
+    mkdir -p "$dir"
+    for d in "$HOME"/.agents/skills/*/; do
+      [ -f "$d/SKILL.md" ] || continue
+      n=$(basename "$d")
+      [ -e "$dir/$n" ] || [ -L "$dir/$n" ] || ln -s "${d%/}" "$dir/$n"
+    done
+    for l in "$dir"/*; do
+      [ -L "$l" ] && [ ! -e "$l" ] && rm -f "$l"
+    done
+  done
+  return 0
+}
+
+# ---------------------------------------------------------------- Claude Code
+run_claude() {
+  local mcp tools
+  mcp=$(jq -cn --arg url "$URL/mcp?chat=$SID" --arg auth "Bearer $TOKEN" \
+    '{mcpServers:{phone:{type:"http",url:$url,headers:{Authorization:$auth},timeout:600000}}}')
+  link_skills
+  tools=("mcp__phone" "WebSearch" "WebFetch" "Read(/$S/files/**)" "Read(/$D/GUIDE.md)" "Skill"
+    "Read(/$HOME/.agents/skills/**)" "Read(/$HOME/.claude/skills/**)")
+  [ "$DEV" = rule ] && tools=("mcp__phone")
+  local deny=()
+  [ "$DEV" = rule ] && deny=(--disallowedTools "Bash" "WebFetch" "WebSearch" "Write" "Edit" "NotebookEdit" "Skill")
+  [ "$DEV" = 1 ] && tools+=("Bash" "Read" "Write" "Edit" "Glob" "Grep" "Skill")
+  local args=(-p "$MSG" --output-format stream-json --verbose
+    --mcp-config "$mcp" --strict-mcp-config
+    --allowedTools "${tools[@]}" "${deny[@]}"
+    --append-system-prompt "$SYSTEM")
+  [ -s "$S/claude-session" ] && args+=(--resume "$(cat "$S/claude-session")")
+  [ -n "${MODEL:-}" ] && args+=(--model "${SVCM:-$MODEL}")
+  [ -n "${EFFORT:-}" ] && args+=(--effort "$EFFORT")
+  # an API key service: every model Claude Code would pick (its helpers and subagents too) is the chosen one, and it
+  # gets the real context size, not the one it guesses for a model it does not know; the plan stays for the rest
+  local keyenv=()
+  if [ -n "$SVC" ]; then
+    keyenv=(env -u ANTHROPIC_API_KEY ANTHROPIC_BASE_URL="$URL/llm/$SVC/a" ANTHROPIC_AUTH_TOKEN="$TOKEN"
+      ANTHROPIC_MODEL="$SVCM" ANTHROPIC_DEFAULT_OPUS_MODEL="$SVCM" ANTHROPIC_DEFAULT_SONNET_MODEL="$SVCM"
+      ANTHROPIC_DEFAULT_HAIKU_MODEL="$SVCM" CLAUDE_CODE_SUBAGENT_MODEL="$SVCM")
+    local win
+    win=$(svc_window)
+    [ -n "$win" ] && keyenv+=(CLAUDE_CODE_MAX_CONTEXT_TOKENS="$win")
+  fi
+  cd "$W" && "${keyenv[@]}" claude "${args[@]}" 2>"$S/last-error.log"
+}
+
+stream_claude() {
+  while IFS= read -r line; do
+    [ -z "$line" ] && continue
+    printf '%s' "$line" | tag | post
+    sid=$(printf '%s' "$line" | jq -r 'select(.session_id != null) | .session_id' 2>/dev/null)
+    [ -n "$sid" ] && printf '%s' "$sid" > "$S/claude-session"
+  done
+}
+
+# ---------------------------------------------------------------------- Codex
+# The phone server is passed with -c (no config file needed). Only the phone tools are
+# pre-approved. Normal mode keeps Codex's shell read-only; developer mode opens all of Buddy's Linux to it.
+run_codex() {
+  local prompt=$MSG
+  local cfg=(-c 'mcp_servers.phone.url="'"$URL"'/mcp?chat='"$SID"'"'
+    -c 'mcp_servers.phone.bearer_token_env_var="BUDDY_TOKEN"'
+    -c 'mcp_servers.phone.default_tools_approval_mode="approve"'
+    -c 'mcp_servers.phone.tool_timeout_sec=600')
+  # Linux tools off (and a rule's run): no shell at all, as for Claude Code, not even read-only commands
+  local sandbox=(--sandbox read-only --disable shell_tool --disable unified_exec)
+  # developer mode: the whole of Buddy's Linux, like Claude Code's Bash and OpenCode (so apk add works too)
+  [ "$DEV" = 1 ] && sandbox=(--sandbox danger-full-access)
+  # a run with a file attached (not a picture, which goes in with --image) keeps read-only commands to open it
+  [ "$DEV" != 1 ] && [ ${#ATT[@]} -gt ${#IMGS[@]} ] && sandbox=(--sandbox read-only)
+  # an API key service: through the relay, over plain requests (no WebSocket, which other services refuse), with the
+  # real context size
+  if [ -n "$SVC" ]; then
+    cfg+=(-c 'model_provider="buddy-key"'
+      -c 'model_providers.buddy-key={name="API key",base_url="'"$URL/llm/$SVC/o"'",wire_api="responses",env_key="BUDDY_TOKEN",supports_websockets=false}')
+    local win
+    win=$(svc_window)
+    [ -n "$win" ] && cfg+=(-c "model_context_window=$win")
+  fi
+  [ -n "${MODEL:-}" ] && cfg+=(-m "${SVCM:-$MODEL}")
+  [ -n "${EFFORT:-}" ] && cfg+=(-c "model_reasoning_effort=\"$EFFORT\"")
+  local img=() f
+  for f in "${IMGS[@]}"; do img+=("--image=$f"); done
+  cd "$W" || return 1
+  if [ -s "$S/codex-thread" ]; then
+    BUDDY_TOKEN=$TOKEN codex exec "${cfg[@]}" "${sandbox[@]}" --json --skip-git-repo-check \
+      resume "${img[@]}" -- "$(cat "$S/codex-thread")" "$prompt" </dev/null 2>"$S/last-error.log"
+  else
+    # codex exec has no system-prompt flag, so Buddy's instructions lead the first message.
+    prompt="$SYSTEM"$'\n\n---\n\nUser message from the Buddy bubble:\n'"$MSG"
+    BUDDY_TOKEN=$TOKEN codex exec "${cfg[@]}" "${sandbox[@]}" "${img[@]}" --json --skip-git-repo-check \
+      -- "$prompt" </dev/null 2>"$S/last-error.log"
+  fi
+}
+
+# Translate Codex's JSONL events into the Claude Code stream format the bubble understands.
+stream_codex() {
+  local pics_since="$S/codex-pictures-since"
+  : > "$pics_since"
+  while IFS= read -r line; do
+    [ -z "$line" ] && continue
+    tid=$(printf '%s' "$line" | jq -r 'select(.type=="thread.started") | .thread_id // empty' 2>/dev/null)
+    [ -n "$tid" ] && printf '%s' "$tid" > "$S/codex-thread"
+    # Codex doesn't say which model it used; its session log does (shown when the chat is on "Default")
+    if [ "$(printf '%s' "$line" | jq -r '.type // empty' 2>/dev/null)" = turn.completed ] && [ -s "$S/codex-thread" ]; then
+      local log model
+      log=$(find "$HOME/.codex/sessions" -name "rollout-*$(cat "$S/codex-thread").jsonl" 2>/dev/null | head -1)
+      # pictures its image tool made this turn: it often doesn't name them, so the chat is told here
+      find "$HOME/.codex/generated_images/$(cat "$S/codex-thread")" -type f -newer "$pics_since" 2>/dev/null | sort \
+        | jq -Rsc --arg s "$SID" 'split("\n") | map(select(length > 0)) | select(length > 0)
+            | {type:"buddy_pictures", paths:., buddy_session:$s}' 2>/dev/null | post
+      : > "$pics_since"
+      model=$([ -n "$log" ] && grep '"turn_context"' "$log" | tail -1 | jq -r '.payload.model // empty' 2>/dev/null)
+      [ -n "$model" ] && jq -cn --arg m "$model" --arg s "$SID" '{type:"system", subtype:"model", model:$m, buddy_session:$s}' | post
+      # how full the context is and its size, from the same token_count
+      [ -n "$log" ] && grep '"token_count"' "$log" | tail -1 | jq -c --arg s "$SID" '.payload.info // empty
+        | select(.model_context_window != null)
+        | {type:"buddy_context", used:(.last_token_usage.total_tokens // 0), window:.model_context_window, buddy_session:$s}' \
+        2>/dev/null | post
+      # the plan's 5-hour and weekly limits, from the log's last token_count, passed on as Claude Code reports them
+      [ -n "$log" ] && grep '"rate_limits"' "$log" | tail -1 | jq -c --arg s "$SID" '.payload.rate_limits // empty
+        | [.primary, .secondary] | map(select(. != null and .window_minutes != null)
+            | {key:(if .window_minutes <= 300 then "five_hour" else "seven_day" end),
+               value:{utilization:((.used_percent // 0) / 100), resetsAt:(.resets_at // 0)}})
+        | select(length > 0)
+        | {type:"rate_limit_event", rate_limit_info:{unifiedWindows:from_entries}, buddy_session:$s}' 2>/dev/null | post
+    fi
+    printf '%s' "$line" | jq -c --arg s "$SID" '
+      (if .type == "item.started" and .item.type == "mcp_tool_call" then
+        {type:"assistant", message:{content:[{type:"tool_use",
+          name:("mcp__" + (.item.server // "phone") + "__" + (.item.tool // "")),
+          input:(.item.arguments // {})}]}}
+      elif .type == "item.started" and .item.type == "command_execution" then
+        {type:"assistant", message:{content:[{type:"tool_use", name:"Bash",
+          input:{command:(.item.command // "")}}]}}
+      elif .type == "item.completed" and .item.type == "file_change" then
+        {type:"assistant", message:{content:[{type:"tool_use", name:"Edit", input:{}}]}}
+      elif .type == "item.completed" and .item.type == "agent_message" then
+        {type:"assistant", message:{content:[{type:"text", text:(.item.text // "")}]}}
+      elif .type == "turn.completed" then
+        {type:"result", subtype:"success", result:""}
+      elif .type == "turn.failed" then
+        {type:"result", subtype:"error", is_error:true, result:("Codex: " + (.error.message // "turn failed"))}
+      elif .type == "error" then
+        {type:"buddy_error", text:("Codex: " + (.message // "error"))}
+      else empty end) | . + {buddy_session:$s}' 2>/dev/null | while IFS= read -r ev; do printf '%s' "$ev" | post; done
+  done
+}
+
+# ------------------------------------------------------------------- OpenCode
+# Config goes in through OPENCODE_CONFIG_CONTENT: the phone server, Buddy's instructions (a file), no
+# auto-update or sharing. Normal mode sets shell and edits to "ask", which a non-interactive run
+# auto-rejects ("deny" would drop those tools, and OpenCode's free models refuse a changed tool set).
+run_opencode() {
+  # OpenCode names MCP tools <server>_<tool>; small models otherwise call "read_screen" and give up
+  printf '%s\n\n%s\n' "$SYSTEM" "In this app the phone tools are named with a phone_ prefix: phone_read_screen, phone_tap, \
+phone_long_press, phone_type_text, phone_scroll, phone_swipe, phone_press, phone_open_app, phone_list_apps, phone_open_url, \
+phone_screenshot, phone_wait, phone_confirm, phone_ask, phone_notify, phone_reply_notification, phone_schedule_message, phone_list_scheduled, phone_cancel_scheduled, phone_update_buddy, phone_install_apk and phone_wait_for_install\
+$([ "$BROWSER" = 1 ] && printf '%s' ", and for the background browser phone_browser_open, phone_browser_read, phone_browser_click, \
+phone_browser_type, phone_browser_scroll, phone_browser_screenshot, phone_browser_back and phone_browser_tabs"). Always call them by \
+these exact names; they are available in every message of this chat." > "$S/system.md"
+  local cfg v2=0
+  oc2 && v2=1
+  # OpenCode 2 ignores instructions given through OPENCODE_CONFIG_CONTENT (the model never saw this prompt),
+  # but reads its global AGENTS.md, next to the work folder's own. Buddy owns that file (marked on line 1)
+  # and leaves one the user wrote alone.
+  if [ "$v2" = 1 ]; then
+    local g=$HOME/.config/opencode/AGENTS.md
+    if [ ! -s "$g" ] || head -1 "$g" | grep -q '^<!-- buddy -->'; then
+      mkdir -p "${g%/*}" && { echo '<!-- buddy -->'; cat "$S/system.md"; } > "$g"
+    fi
+  fi
+  # OpenCode 2 only takes codemode under mcp.servers; without it the phone tools hide behind one "execute" tool
+  cfg=$(jq -cn --arg url "$URL/mcp?chat=$SID" --arg auth "Bearer $TOKEN" --arg sys "$S/system.md" --arg dev "$DEV" --arg v2 "$v2" '
+    {type:"remote", url:$url, headers:{Authorization:$auth}, oauth:false} as $phone
+    | (if $v2 == "1" then {mcp:{servers:{phone:($phone + {codemode:false, timeout:{execution:600000}})}}}
+       else {mcp:{phone:($phone + {timeout:600000})}} end)
+    + {instructions:[$sys], autoupdate:false, share:"disabled"}
+    + (if $dev == "1" then {} elif $dev == "rule" then {permission:{bash:"ask", edit:"ask", webfetch:"ask"}}
+       else {permission:{bash:"ask", edit:"ask"}} end)')
+  # an API key service: a provider of its own, pointed at the relay (OpenAI-style when it has that address)
+  if [ -n "$SVC" ]; then
+    cfg=$(jq -c --argjson c "$cfg" --arg url "$URL/llm/$SVC" --arg t "$TOKEN" --arg id "buddy-$SVC" '
+      (if .openai != "" then {npm:"@ai-sdk/openai-compatible", options:{baseURL:($url + "/o"), apiKey:$t}}
+       else {npm:"@ai-sdk/anthropic", options:{baseURL:($url + "/a/v1"), apiKey:$t}} end) as $p
+      | $c + {provider:{($id):($p + {name:.name, models:(.models | with_entries(.value = ({name:.value.name}
+          + (if .value.window > 0 then {limit:{context:.value.window, output:([.value.window / 4, 32000] | min | floor)}}
+             else {} end))))})}}' "$D/providers/$SVC.json") || return 1
+  fi
+  local args=(run --format json)
+  [ "$v2" = 1 ] && args+=(--standalone)
+  [ -s "$S/opencode-session" ] && args+=(-s "$(cat "$S/opencode-session")")
+  [ -n "$SVC" ] && MODEL="buddy-$SVC/$SVCM"
+  [ -n "${MODEL:-}" ] && args+=(-m "$MODEL")
+  local f
+  for f in "${ATT[@]}"; do args+=(-f "$f"); done
+  cd "$W" && OPENCODE_CONFIG_CONTENT=$cfg opencode "${args[@]}" -- "$MSG" </dev/null 2>"$S/last-error.log"
+}
+
+# Translate OpenCode's JSON events into the Claude Code stream format the bubble understands.
+# Only the text of the step that ends the turn (its answer) is shown: text written before tool calls is
+# the model thinking out loud (free models even leak their reasoning, ending in </think>), and Buddy
+# doesn't show Claude Code's or Codex's thinking either. Tool calls still show as steps.
+stream_opencode() {
+  local pending="" failed="" line sid typ t
+  while IFS= read -r line; do
+    [ -z "$line" ] && continue
+    sid=$(printf '%s' "$line" | jq -r '.sessionID // empty' 2>/dev/null)
+    [ -n "$sid" ] && printf '%s' "$sid" > "$S/opencode-session"
+    typ=$(printf '%s' "$line" | jq -r '.type // empty' 2>/dev/null)
+    [ "$typ" = error ] && failed=1
+    case "$typ" in
+      step_start) pending="" ;;
+      text)
+        t=$(printf '%s' "$line" | jq -r '.part.text // "" | gsub("(?s)<think>.*?</think>"; "") | split("</think>") | last
+          | sub("^\\s+"; "") | sub("\\s+$"; "")' 2>/dev/null)
+        [ -n "$t" ] && pending="${pending:+$pending$'\n\n'}$t" ;;
+      step_finish)
+        if [ "$(printf '%s' "$line" | jq -r '.part.reason // empty' 2>/dev/null)" = stop ]; then
+          [ -n "$pending" ] && jq -cn --arg t "$pending" --arg s "$SID" \
+            '{type:"assistant", message:{content:[{type:"text", text:$t}]}, buddy_session:$s}' | post
+          jq -cn --arg s "$SID" '{type:"result", subtype:"success", result:"", buddy_session:$s}' | post
+        fi
+        pending="" ;;
+      tool_use|error)
+        printf '%s' "$line" | jq -c --arg s "$SID" '
+          (if .type == "tool_use" and .part.tool == "invalid" then empty   # a mistyped tool name; the model retries
+          elif .type == "tool_use" and .part.tool == "execute" then empty  # OpenCode 2 code tool (the phone is not in it)
+          elif .type == "tool_use" then
+            (.part.tool // "") as $t
+            | {type:"assistant", message:{content:[{type:"tool_use",
+                name:(if ($t | startswith("phone_")) then "mcp__phone__" + ($t | ltrimstr("phone_"))
+                      elif ($t == "bash" or $t == "shell") then "Bash" elif ($t == "edit" or $t == "write" or $t == "patch") then "Edit"
+                      elif $t == "read" then "Read" else $t end),
+                input:((.part.state.input // {}) + (if ($t == "phone_confirm" or $t == "phone_ask")
+                  then {_answer:(.part.state.output // "")} else {} end))}]}}
+          else
+            {type:"result", subtype:"error", is_error:true,
+             result:((.error.data.message // .error.message // .error.name // .error.type // "error") as $m
+               | if ($m | test("free tier"; "i")) then "OpenCode free models turned this request down (they sometimes do when busy). Try again in a moment, or pick another model."
+                 else "OpenCode: " + $m end)}
+          end) | . + {buddy_session:$s}' 2>/dev/null | while IFS= read -r ev; do printf '%s' "$ev" | post; done ;;
+    esac
+  done
+  # OpenCode 2 sometimes ends without the last step_finish: still show the answer
+  if [ -n "$pending" ] && [ -z "$failed" ]; then
+    jq -cn --arg t "$pending" --arg s "$SID" '{type:"assistant", message:{content:[{type:"text", text:$t}]}, buddy_session:$s}' | post
+    jq -cn --arg s "$SID" '{type:"result", subtype:"success", result:"", buddy_session:$s}' | post
+  fi
+}
+
+# ---------------------------------------------------------------- Antigravity
+# agy reads MCP servers only from ~/.gemini/config/mcp_config.json and permissions from its settings.json, but each
+# chat needs its own phone address (?chat=) and mode. So every run gets its own HOME: its own config and settings,
+# with everything else (the sign-in, conversations) linked to the real ~/.gemini/antigravity-cli.
+# Only the phone tools (and the chat's attachments) are pre-approved; developer mode skips agy's permission checks,
+# like Codex's full access. timeoutSeconds: an approval card may wait for the user (10 minutes, as for the others).
+AGY_PHONE_TOOLS='["read_screen","tap","long_press","type_text","scroll","swipe","press","open_app","list_apps","open_url",
+"screenshot","wait","confirm","ask","notify","reply_notification","schedule_message","list_scheduled","cancel_scheduled",
+"update_buddy","install_apk","wait_for_install","point_out"]'
+run_agy() {
+  local h=$S/agy-home g=$HOME/.gemini/antigravity-cli f list tools sigs
+  mkdir -p "$h/.gemini/config" "$h/.gemini/antigravity-cli" "$g" "$HOME/.gemini/config"
+  for f in "$g"/* "$g"/.[!.]*; do
+    [ -e "$f" ] || continue
+    case "${f##*/}" in settings.json|brain) continue ;; esac
+    ln -sfn "$f" "$h/.gemini/antigravity-cli/${f##*/}"
+  done
+  # agy saves a long tool result (list_apps, …) under brain/<conversation>/ and has the model read it back, but it
+  # only lets the model read inside its own folder, and a link out of it doesn't count: each chat keeps its own brain/
+  [ -L "$h/.gemini/antigravity-cli/brain" ] && rm -f "$h/.gemini/antigravity-cli/brain"
+  mkdir -p "$h/.gemini/antigravity-cli/brain"
+  for f in "$HOME/.gemini/config"/*; do
+    [ -e "$f" ] && [ "${f##*/}" != mcp_config.json ] && ln -sfn "$f" "$h/.gemini/config/${f##*/}"
+  done
+  ( umask 077
+    jq -n --arg url "$URL/mcp?chat=$SID" --arg auth "Bearer $TOKEN" \
+      '{mcpServers:{phone:{url:$url, headers:{Authorization:$auth}, timeoutSeconds:600}}}' > "$h/.gemini/config/mcp_config.json" )
+  # the phone's tools as the server lists them (a newer Buddy may have more); the known list if that fails
+  list=$(curl -s -m 10 -X POST -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
+    -H 'Accept: application/json, text/event-stream' --data '{"jsonrpc":"2.0","id":1,"method":"tools/list"}' \
+    "$URL/mcp?chat=$SID")
+  tools=$(jq -c '[.result.tools[].name] | select(length > 0)' <<<"$list" 2>/dev/null)
+  # and their arguments, "tap(element?, x?, y?)": agy itself only lists tool names, and reads a tool's description
+  # file before using it (a model round trip each), or guesses the arguments
+  sigs=$(jq -r '[.result.tools[] | (.inputSchema.required // []) as $req | "\(.name)(" + ((.inputSchema.properties // {})
+    | keys_unsorted | map(. as $k | if ($req | index($k)) != null then $k else $k + "?" end) | join(", ")) + ")"]
+    | join(", ")' <<<"$list" 2>/dev/null)
+  jq -n --argjson t "${tools:-$AGY_PHONE_TOOLS}" --arg files "$S/files" --arg brain "$h/.gemini/antigravity-cli/brain" \
+    '{permissions:{allow:([$t[] | "mcp(phone/\(.))"] + ["read_file(\($files))", "read_file(\($brain))"])}}' \
+    > "$h/.gemini/antigravity-cli/settings.json"
+  local prompt=$MSG args names note
+  if [ ${#IMGS[@]} -gt 0 ]; then
+    prompt="$prompt
+
+The user attached image file(s) in $S/files:
+$(printf -- '- %s\n' "${IMGS[@]}")
+Inspect the actual image content. Do not claim that this chat cannot accept images merely because it is a phone-agent mode. Use the image/file reading capability available to this agent. If this particular model or provider genuinely rejects image input, report that exact provider limitation and ask to switch to a vision-capable model; do not ask the user to describe an image you have not attempted to inspect."
+  fi
+  # agy has no system-prompt flag, so Buddy's instructions lead a new conversation's first message (as for Codex).
+  # It also lists MCP tools only by file: say how to call the phone's, or it goes looking (e.g. with ls, which a
+  # normal chat refuses, and then it stops).
+  [ -n "$sigs" ] || sigs=$(jq -r 'join(", ")' <<<"$AGY_PHONE_TOOLS" 2>/dev/null)
+  note="In this app the phone tools are on the MCP server named \"phone\". Call them right away with call_mcp_tool \
+(ServerName \"phone\", the ToolName and its Arguments as listed here; ? marks an optional one): $sigs. You don't need \
+to read their descriptions first; only if an argument is unclear, read_file \
+$h/.gemini/antigravity-cli/mcp/phone/<tool>.json."
+  [ "$DEV" = 1 ] || note="$note Shell commands are not available in this chat; don't try them."
+  [ -s "$S/agy-conversation" ] || prompt="$SYSTEM"$'\n\n'"$note"$'\n\n---\n\nUser message from the Buddy bubble:\n'"$MSG"
+  args=(-p "$prompt" --output-format stream-json)
+  [ -s "$S/agy-conversation" ] && args+=(--conversation "$(cat "$S/agy-conversation")")
+  [ -n "${MODEL:-}" ] && args+=(--model "$MODEL")
+  [ -n "${EFFORT:-}" ] && args+=(--effort "$EFFORT")
+  [ "$DEV" = 1 ] && args+=(--dangerously-skip-permissions)
+  rm -f "$S/agy-error"
+  cd "$W" && HOME=$h agy "${args[@]}" </dev/null 2>"$S/last-error.log"
+  local status=$?
+  # a token refresh that replaced the link with a file: keep the new token in the real folder
+  f=$h/.gemini/antigravity-cli/antigravity-oauth-token
+  [ -f "$f" ] && [ ! -L "$f" ] && mv -f "$f" "$g/antigravity-oauth-token" && ln -sfn "$g/antigravity-oauth-token" "$f"
+  return $status
+}
+
+# Translate agy's stream-json events (init, step_update, result) into the Claude Code stream format.
+# A step's text arrives in pieces (text_delta) and is shown once the step is done; a tool step shows once.
+# agy ends its turn when a permission is refused (no one to ask), often without a word. Then, unless this is the
+# last try ($1 = last), the result isn't shown and $S/agy-denied says what was refused, for one nudge.
+stream_agy() {
+  local line typ idx state ev t denied="" said=""
+  declare -A text=() shown=()
+  rm -f "$S/agy-denied"
+  while IFS= read -r line; do
+    [ -z "$line" ] && continue
+    typ=$(printf '%s' "$line" | jq -r '.event // empty' 2>/dev/null)
+    case "$typ" in
+      init)
+        printf '%s' "$line" | jq -r '.conversation_id // .init.conversation_id // empty' 2>/dev/null > "$S/agy-conversation.new"
+        if [ -s "$S/agy-conversation.new" ]; then mv "$S/agy-conversation.new" "$S/agy-conversation"; else rm -f "$S/agy-conversation.new"; fi ;;
+      step_update)
+        idx=$(printf '%s' "$line" | jq -r '.step_update.step_index // 0' 2>/dev/null)
+        state=$(printf '%s' "$line" | jq -r '.step_update.state // empty' 2>/dev/null)
+        case "$(printf '%s' "$line" | jq -r '.step_update.step_type // empty' 2>/dev/null)" in
+          user_input) ;;
+          agent_response)
+            text[$idx]+=$(printf '%s' "$line" | jq -j '.step_update.text_delta // ""' 2>/dev/null; printf x)
+            text[$idx]=${text[$idx]%x}
+            if [ "$state" = DONE ] && [ -z "${shown[$idx]:-}" ]; then
+              shown[$idx]=1
+              t=$(printf '%s' "${text[$idx]}" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')
+              [ -n "$t" ] && said=1
+              [ -n "$t" ] && jq -cn --arg t "$t" --arg s "$SID" \
+                '{type:"assistant", message:{content:[{type:"text", text:$t}]}, buddy_session:$s}' | post
+            fi ;;
+          *)
+            # a tool step (step_type "tool"): its tool_info has the name and parameters; a phone tool comes as
+            # call_mcp_tool with {ServerName, ToolName, Arguments}. Before agy first uses an MCP tool it reads the
+            # tool's description file from its own folder (…/antigravity-cli/mcp/<server>/<tool>.json), and it reads a
+            # long result back from …/antigravity-cli/brain/…/output.txt: neither is shown.
+            if [ "$state" = ERROR ]; then
+              # refused by its permissions (a shell command in a normal chat, …): say so under the step
+              t=$(printf '%s' "$line" | jq -r '.step_update as $u | ($u.tool_info // {}) as $i
+                | select(($i.error.message // "") | test("denied permission|permission check failed"; "i"))
+                | ($i.parameters.CommandLine // $u.tool_name // $i.name // "?")' 2>/dev/null)
+              if [ -n "$t" ]; then
+                denied=$t
+                jq -cn --arg t "Not allowed in this chat: $t" --arg s "$SID" '{type:"buddy_step", text:$t, buddy_session:$s}' | post
+              fi
+              continue
+            fi
+            [ -n "${shown[$idx]:-}" ] && continue
+            ev=$(printf '%s' "$line" | jq -c --arg s "$SID" '
+              .step_update as $u | ($u.tool_info // {}) as $i | ($i.parameters // {}) as $p
+              | ($u.tool_name // $i.name // "") as $t
+              | select($t != "")
+              | select(([$t] | inside(["finish", "wait", "wait_5_seconds", "list_permissions", "ask_permission",
+                  "ask_custom_permission"])) | not)
+              | select(($t == "read_file" or $t == "view_file") and (($p.Path // "") | test("/antigravity-cli/(mcp|brain)/")) | not)
+              | (($p.Arguments // {}) | if type == "string" then (fromjson? // {}) else . end) as $args
+              | {type:"assistant", message:{content:[{type:"tool_use",
+                  name:(if $t == "call_mcp_tool" then "mcp__" + ($p.ServerName // "phone") + "__" + ($p.ToolName // "")
+                        elif $t == "run_command" or $t == "send_command_input" then "Bash"
+                        elif ($t | test("^(write_to_file|replace_file_content|multi_replace_file_content|sed_file|notebook_edit)$")) then "Edit"
+                        elif $t == "read_file" or $t == "view_file" then "Read" elif $t == "search_web" then "WebSearch"
+                        elif $t == "read_url_content" then "WebFetch" else $t end),
+                  input:(if $t == "call_mcp_tool" then (if ($args | type) == "object" then $args else {} end)
+                         else ({command:($p.CommandLine // $p.Command // null),
+                                file_path:($p.Path // $p.TargetFile // $p.AbsolutePath // $p.FilePath // null),
+                                query:($p.Query // null), url:($p.Url // $p.URL // null)}
+                               | with_entries(select(.value != null and (.value | type) == "string"))) end)}]},
+                buddy_session:$s}' 2>/dev/null)
+            [ -n "$ev" ] && { printf '%s' "$ev" | post; shown[$idx]=1; }
+            ;;
+        esac ;;
+      result)
+        if [ "$(printf '%s' "$line" | jq -r '.result.status // empty' 2>/dev/null)" = SUCCESS ]; then
+          # a refused file read shows only here, in denied_actions (its step just ends without output)
+          if [ -z "$denied" ]; then
+            denied=$(printf '%s' "$line" | jq -r '[.result.denied_actions[]? | .display_name // .action] | unique | join(", ")' 2>/dev/null)
+            [ -n "$denied" ] && jq -cn --arg t "Not allowed in this chat: $denied" --arg s "$SID" \
+              '{type:"buddy_step", text:$t, buddy_session:$s}' | post
+          fi
+          if [ -n "$denied" ] && [ -z "$said" ]; then
+            if [ "${1:-}" = last ]; then
+              jq -cn --arg s "$SID" --arg d "$denied" '{type:"result", subtype:"error", is_error:true,
+                result:("Antigravity stopped after this chat refused: " + $d), buddy_session:$s}' | post
+            else
+              printf '%s' "$denied" > "$S/agy-denied"
+            fi
+          else
+            jq -cn --arg s "$SID" '{type:"result", subtype:"success", result:"", buddy_session:$s}' | post
+          fi
+        else
+          printf '%s' "$line" | jq -r '.result.error // "the request failed"' 2>/dev/null > "$S/agy-error"
+          jq -cn --arg s "$SID" --arg e "$(cat "$S/agy-error")" \
+            '{type:"result", subtype:"error", is_error:true, result:("Antigravity: " + $e), buddy_session:$s}' | post
+        fi ;;
+    esac
+  done
+}
+
+# ---------------------------------------------------------------- Gemini CLI
+# Gemini CLI reads its MCP servers, settings and global GEMINI.md from ~/.gemini, but each chat needs its own phone
+# address (?chat=) and its own tool limits. So every run gets its own HOME: a .gemini whose settings.json and
+# GEMINI.md are this chat's, and everything else (the sign-in, sessions) linked to the real ~/.gemini. A headless run
+# can't ask: a normal chat has no shell or file edits, a rule's run no files, web or memory either; developer mode
+# approves everything (--approval-mode yolo), like Codex's full access.
+GEMINI_TOOLS_NORMAL='["run_shell_command","replace","write_file"]'
+GEMINI_TOOLS_RULE='["run_shell_command","replace","write_file","read_file","read_many_files","glob","grep_search","list_directory","google_web_search","web_fetch","save_memory","activate_skill","write_todos","complete_task","list_mcp_resources","read_mcp_resource"]'
+run_gemini() {
+  local h=$S/gemini-home g=$HOME/.gemini f ex
+  mkdir -p "$h/.gemini" "$g/tmp"
+  link_skills
+  for f in "$g"/* "$g"/.[!.]*; do
+    [ -e "$f" ] || continue
+    case "${f##*/}" in settings.json|GEMINI.md) continue ;; esac
+    ln -sfn "$f" "$h/.gemini/${f##*/}"
+  done
+  ex=$GEMINI_TOOLS_NORMAL
+  [ "$DEV" = rule ] && ex=$GEMINI_TOOLS_RULE
+  ( umask 077
+    jq -n --arg url "$URL/mcp?chat=$SID" --arg auth "Bearer $TOKEN" --argjson ex "$ex" \
+      --argjson base "$(jq -c '.' "$g/settings.json" 2>/dev/null || echo '{}')" '
+      (if ($base | type) == "object" then $base else {} end) as $b
+      | $b * {security:{auth:{selectedType:"oauth-personal"}},
+              mcpServers:{phone:{httpUrl:$url, headers:{Authorization:$auth}, timeout:600000, trust:true}},
+              mcp:{allowed:["phone"]},
+              tools:{exclude:((($b.tools.exclude // []) + $ex) | unique)}}' > "$h/.gemini/settings.json"
+    { printf '%s\n\n' "$SYSTEM"
+      printf '%s' 'In this app the phone tools are on the MCP server named "phone": mcp_phone_read_screen, mcp_phone_tap, mcp_phone_long_press, mcp_phone_type_text, mcp_phone_scroll, mcp_phone_swipe, mcp_phone_press, mcp_phone_open_app, mcp_phone_list_apps, mcp_phone_open_url, mcp_phone_screenshot, mcp_phone_wait, mcp_phone_confirm, mcp_phone_ask, mcp_phone_notify, mcp_phone_reply_notification, mcp_phone_schedule_message, mcp_phone_list_scheduled, mcp_phone_cancel_scheduled, mcp_phone_update_buddy, mcp_phone_install_apk and mcp_phone_wait_for_install'
+      [ "$BROWSER" = 1 ] && printf '%s' ', and for the background browser mcp_phone_browser_open, mcp_phone_browser_read, mcp_phone_browser_click, mcp_phone_browser_type, mcp_phone_browser_scroll, mcp_phone_browser_screenshot, mcp_phone_browser_back and mcp_phone_browser_tabs'
+      printf '%s' '. Always call them by these exact names; they are available in every message of this chat.'
+      [ "$DEV" = 1 ] || printf '%s' ' Shell commands and file edits are not available in this chat; do not try them.'
+      printf '\n'
+    } > "$h/.gemini/GEMINI.md"
+  )
+  local prompt=$MSG f
+  if [ ${#IMGS[@]} -gt 0 ]; then
+    # Gemini CLI's @path syntax sends image bytes as multimodal input; include-directories alone only grants file access.
+    local refs=""
+    for f in "${IMGS[@]}"; do refs+=" @$f"; done
+    prompt="$prompt
+
+Please inspect the attached image(s) directly. They are supplied as Gemini image references:$refs
+Do not say image input is unsupported without first attempting to inspect these references. If this model/provider explicitly rejects image input, explain that limitation and request a vision-capable model."
+  fi
+  local args=(-p "$prompt" --output-format stream-json)
+  [ -s "$S/gemini-session" ] && args+=(--resume "$(cat "$S/gemini-session")")
+  [ -n "${MODEL:-}" ] && args+=(--model "$MODEL")
+  [ "$DEV" = 1 ] && args+=(--approval-mode yolo)
+  [ ${#ATT[@]} -gt 0 ] && args+=(--include-directories "$S/files")
+  rm -f "$S/gemini-error"
+  cd "$W" && HOME=$h GEMINI_CLI_SYSTEM_SETTINGS_PATH="$h/.gemini/settings.json" GEMINI_CLI_TRUST_WORKSPACE=true \
+    gemini "${args[@]}" </dev/null 2>"$S/last-error.log"
+}
+
+# Translate Gemini CLI's stream-json events (init, message, tool_use, tool_result, error, result) into the Claude Code
+# stream format. Its answer arrives in delta pieces; the text is shown when a tool call or the end of the turn follows.
+# Its phone tools are mcp_phone_<tool>; the bubble knows them as mcp__phone__<tool>.
+stream_gemini() {
+  local line typ t pending="" done=0
+  while IFS= read -r line; do
+    [ -z "$line" ] && continue
+    typ=$(printf '%s' "$line" | jq -r '.type // empty' 2>/dev/null)
+    case "$typ" in
+      init)
+        printf '%s' "$line" | jq -r '.session_id // empty' 2>/dev/null > "$S/gemini-session.new"
+        if [ -s "$S/gemini-session.new" ]; then mv "$S/gemini-session.new" "$S/gemini-session"; else rm -f "$S/gemini-session.new"; fi ;;
+      message)
+        [ "$(printf '%s' "$line" | jq -r '.role // empty' 2>/dev/null)" = assistant ] || continue
+        t=$(printf '%s' "$line" | jq -j '.content // ""' 2>/dev/null; printf x)
+        pending+=$t
+        pending=${pending%x} ;;
+      tool_use)
+        if [ -n "$pending" ]; then
+          jq -cn --arg t "$pending" --arg s "$SID" \
+            '{type:"assistant", message:{content:[{type:"text", text:$t}]}, buddy_session:$s}' | post
+          pending=""
+        fi
+        printf '%s' "$line" | jq -c --arg s "$SID" '
+          (.tool_name // "") as $t
+          | ($t | ltrimstr("mcp_") | split("_")) as $p
+          | select($t != "")
+          | {type:"assistant", message:{content:[{type:"tool_use",
+              name:(if ($t | startswith("mcp_")) then "mcp__" + $p[0] + "__" + ($p[1:] | join("_"))
+                    elif $t == "run_shell_command" then "Bash"
+                    elif $t == "read_file" or $t == "read_many_files" then "Read"
+                    elif $t == "write_file" or $t == "replace" then "Edit"
+                    elif $t == "glob" then "Glob"
+                    elif $t == "grep_search" then "Grep"
+                    elif $t == "list_directory" then "LS"
+                    elif $t == "google_web_search" then "WebSearch"
+                    elif $t == "web_fetch" then "WebFetch"
+                    elif $t == "activate_skill" then "Skill"
+                    elif $t == "write_todos" then "TodoWrite"
+                    else $t end),
+              input:(.parameters // {})}]}}
+          | . + {buddy_session:$s}' 2>/dev/null \
+          | while IFS= read -r ev; do [ -n "$ev" ] && printf '%s' "$ev" | post; done ;;
+      error)
+        if [ "$(printf '%s' "$line" | jq -r '.severity // empty' 2>/dev/null)" = error ]; then
+          printf '%s' "$line" | jq -r '.message // ""' 2>/dev/null > "$S/gemini-error"
+        fi ;;
+      result)
+        done=1
+        if [ "$(printf '%s' "$line" | jq -r '.status // empty' 2>/dev/null)" = success ]; then
+          if [ -n "$pending" ]; then
+            jq -cn --arg t "$pending" --arg s "$SID" \
+              '{type:"assistant", message:{content:[{type:"text", text:$t}]}, buddy_session:$s}' | post
+            pending=""
+          fi
+          jq -cn --arg s "$SID" '{type:"result", subtype:"success", result:"", buddy_session:$s}' | post
+        else
+          t=$(printf '%s' "$line" | jq -r '.error.message // empty' 2>/dev/null)
+          [ -n "$t" ] || t=$(cat "$S/gemini-error" 2>/dev/null)
+          [ -n "$t" ] || t="the request failed"
+          printf '%s' "$t" > "$S/gemini-error"
+          jq -cn --arg t "$t" --arg s "$SID" \
+            '{type:"result", subtype:"error", is_error:true, result:("Gemini: " + $t), buddy_session:$s}' | post
+        fi ;;
+    esac
+  done
+  # a turn that ended without a result event: still show its answer
+  if [ "$done" = 0 ] && [ -n "$pending" ]; then
+    jq -cn --arg t "$pending" --arg s "$SID" '{type:"assistant", message:{content:[{type:"text", text:$t}]}, buddy_session:$s}' | post
+    jq -cn --arg s "$SID" '{type:"result", subtype:"success", result:"", buddy_session:$s}' | post
+  fi
+}
+
+# ----------------------------------------------------------------------- Grok
+# grok reads MCP servers from ~/.grok/config.toml (and Claude Code's ~/.claude.json), but each chat needs its own phone
+# address (?chat=). So every run gets its own GROK_HOME: the user's config.toml without its MCP servers, plus the phone
+# with a 10-minute tool timeout (an approval card may wait for the user), and everything else (the sign-in, sessions)
+# linked to the real ~/.grok. A headless run refuses what isn't pre-approved: the phone tools are; normal mode offers
+# only the web and (once the chat has attachments) file reads, a rule's run only the phone; developer mode approves
+# everything, like Codex's full access.
+# grok's bundled skills (docx, pptx, code-review, …), found once per grok version: a phone chat turns them off
+grok_bundled_skills() {
+  local v f
+  v=$(grok --version 2>/dev/null | awk '{print $2}')
+  f=$D/grok-bundled-skills-${v:-unknown}
+  if [ ! -s "$f" ]; then
+    rm -f "$D"/grok-bundled-skills-*
+    (cd /tmp && GROK_CLAUDE_SKILLS_ENABLED=0 GROK_CURSOR_SKILLS_ENABLED=0 timeout 60 grok inspect 2>/dev/null) \
+      | sed -n 's/^ *└ \([A-Za-z0-9._-]*\) .* bundled.*$/\1/p' > "$f.new"
+    [ -s "$f.new" ] && mv -f "$f.new" "$f" || rm -f "$f.new"
+  fi
+  cat "$f" 2>/dev/null
+}
+
+run_grok() {
+  local h=$S/grok-home g=$HOME/.grok f sigs note
+  # sessions/ and logs/ must be links before grok first writes them, or a chat's would stay in its own home
+  mkdir -p "$h" "$g/sessions" "$g/logs"
+  for f in "$g"/* "$g"/.[!.]*; do
+    [ -e "$f" ] || continue
+    [ "${f##*/}" = config.toml ] || ln -sfn "$f" "$h/${f##*/}"
+  done
+  ( umask 077
+    { awk -v lean="$([ "$DEV" = 1 ] || echo 1)" '/^\[/ { skip = /^\[mcp_servers[.\]]/ || (lean && /^\[(skills|compat[.]codex)\]/) }
+        !skip && !/^disabled_mcp_servers/' "$g/config.toml" 2>/dev/null
+      printf '\n[mcp_servers.phone]\nurl = "%s"\ntool_timeout_sec = 600\n\n[mcp_servers.phone.headers]\nAuthorization = "Bearer %s"\n' \
+        "$URL/mcp?chat=$SID" "$TOKEN"
+      if [ "$DEV" != 1 ]; then
+        printf '\n[skills]\ndisabled = [%s]\n\n[compat.codex]\nskills = false\nhooks = false\n' \
+          "$(grok_bundled_skills | sed 's/.*/"&"/' | paste -sd, -)"
+      fi
+    } > "$h/config.toml" )
+  # the phone's tools with their arguments, "tap(element?, x?, y?)": grok otherwise looks each one up first (search_tool)
+  sigs=$(curl -s -m 10 -X POST -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
+    -H 'Accept: application/json, text/event-stream' --data '{"jsonrpc":"2.0","id":1,"method":"tools/list"}' \
+    "$URL/mcp?chat=$SID" | jq -r '[.result.tools[] | (.inputSchema.required // []) as $req | "\(.name)(" + ((.inputSchema.properties // {})
+    | keys_unsorted | map(. as $k | if ($req | index($k)) != null then $k else $k + "?" end) | join(", ")) + ")"]
+    | join(", ")' 2>/dev/null)
+  note="In this app the phone tools are on the MCP server named \"phone\". Call them right away with use_tool \
+(tool_name \"phone__<tool>\", e.g. phone__read_screen, and tool_input with its arguments${sigs:+ as listed here; ? marks an \
+optional one: $sigs}). You don't need search_tool for them."
+  [ "$DEV" = 1 ] || note="$note Shell commands are not available in this chat; don't try them."
+  # --rules adds Buddy's instructions to grok's own, on every run (as --append-system-prompt does for Claude Code)
+  local args=(-p "$MSG" --output-format streaming-messages-json --rules "$SYSTEM"$'\n\n'"$note" --allow 'MCPTool(phone__*)')
+  case "$DEV" in
+    1) args+=(--always-approve) ;;
+    rule) args+=(--tools use_tool --disable-web-search) ;;  # use_tool and search_tool: the phone only
+    *) if [ -d "$S/files" ]; then args+=(--tools read_file,web_search,web_fetch); else args+=(--tools web_search,web_fetch); fi
+       args+=(--allow WebFetch) ;;
+  esac
+  [ "$DEV" = 1 ] || args+=(--no-subagents --no-plan)
+  [ -s "$S/grok-session" ] && args+=(-r "$(cat "$S/grok-session")")
+  [ -n "${MODEL:-}" ] && args+=(-m "$MODEL")
+  [ -n "${EFFORT:-}" ] && args+=(--effort "$EFFORT")
+  local lean=()
+  [ "$DEV" = 1 ] || lean=(GROK_MEMORY=0 GROK_CLAUDE_SKILLS_ENABLED=0 GROK_CURSOR_SKILLS_ENABLED=0 GROK_CLAUDE_RULES_ENABLED=0
+    GROK_CURSOR_RULES_ENABLED=0 GROK_CLAUDE_AGENTS_ENABLED=0 GROK_CURSOR_AGENTS_ENABLED=0 GROK_CLAUDE_HOOKS_ENABLED=0
+    GROK_CURSOR_HOOKS_ENABLED=0)
+  cd "$W" && env "${lean[@]}" GROK_HOME=$h GROK_CLAUDE_MCPS_ENABLED=0 GROK_CURSOR_MCPS_ENABLED=0 GROK_DISABLE_AUTOUPDATER=1 \
+    grok "${args[@]}" </dev/null 2>"$S/last-error.log"
+  local status=$?
+  # a token refresh that replaced the link with a file: keep the new login in the real folder
+  f=$h/auth.json
+  [ -f "$f" ] && [ ! -L "$f" ] && mv -f "$f" "$g/auth.json" && ln -sfn "$g/auth.json" "$f"
+  return $status
+}
+
+# grok's streaming-messages-json is Claude Code's stream format; only the tool names differ. A phone tool comes as
+# use_tool {tool_name:"phone__tap", tool_input}; its lookups (search_tool) and its thinking aren't shown. A step the
+# run refused (headless grok can't ask) is only on stderr ("permission required: … was not run"): said under the steps.
+stream_grok() {
+  local line typ sid t=""
+  rm -f "$S/grok-error"
+  while IFS= read -r line; do
+    [ -z "$line" ] && continue
+    typ=$(printf '%s' "$line" | jq -r '.type // empty' 2>/dev/null)
+    case "$typ" in
+      system)
+        sid=$(printf '%s' "$line" | jq -r '.session_id // empty' 2>/dev/null)
+        [ -n "$sid" ] && printf '%s' "$sid" > "$S/grok-session" ;;
+      result)
+        t=$(sed -n 's/^permission required: \(.*\) was not run.*/\1/p' "$S/last-error.log" 2>/dev/null | sort -u | paste -sd, - | sed 's/,/, /g')
+        [ -n "$t" ] && jq -cn --arg t "Not allowed in this chat: $t" --arg s "$SID" '{type:"buddy_step", text:$t, buddy_session:$s}' | post
+        printf '%s' "$line" | jq -r 'select(.is_error) | (.errors // []) | join("; ") | if . == "" then "the request failed" else . end' \
+          2>/dev/null > "$S/grok-error" ;;
+    esac
+    printf '%s' "$line" | jq -c --arg s "$SID" --arg denied "$t" '
+      (if .type == "system" then {type, subtype, session_id, model}
+      elif .type == "assistant" then
+        .message.content |= [.[] | select(.type == "text" or (.type == "tool_use" and .name != "search_tool"))
+          | if .type == "text" then . else
+              (.input // {}) as $in | .name as $t
+              | if $t == "use_tool" then
+                  {type, name:("mcp__" + ($in.tool_name // "")),
+                   input:(($in.tool_input // {}) | if type == "string" then (fromjson? // {}) else . end)}
+                elif ($t | test("^[A-Za-z_][A-Za-z0-9_-]*__")) then {type, name:("mcp__" + $t), input:$in}
+                elif $t == "run_terminal_command" or $t == "run_terminal_cmd" then {type, name:"Bash", input:{command:($in.command // "")}}
+                elif $t == "write" or $t == "search_replace" then {type, name:"Edit", input:{file_path:($in.file_path // $in.target_file // "")}}
+                elif $t == "read_file" then {type, name:"Read", input:{file_path:($in.target_file // $in.file_path // $in.path // "")}}
+                elif $t == "web_search" then {type, name:"WebSearch", input:{query:($in.query // "")}}
+                elif $t == "web_fetch" then {type, name:"WebFetch", input:{url:($in.url // "")}}
+                else {type, name:$t, input:$in} end
+            end]
+        | select(.message.content | length > 0) | {type, message:{content:.message.content}}
+      elif .type == "result" and .is_error then
+        {type, subtype, is_error, result:(if $denied != "" and .errors == ["cancelled"] then "Grok stopped after this chat refused: " + $denied
+          else "Grok: " + ((.errors // []) | join("; ") | if . == "" then "the request failed" else . end) end)}
+      elif .type == "result" then {type, subtype, result:(.result // "")}
+      elif .type == "error" then {type:"result", subtype:"error", is_error:true, result:("Grok: " + (.message // "error"))}
+      else empty end) | . + {buddy_session:$s}' 2>/dev/null | while IFS= read -r ev; do printf '%s' "$ev" | post; done
+  done
+}
+
+# Tests (linux/test/run.sh): translate an agent's recorded output from stdin with its stream_ function and print the
+# events instead of posting them.
+if [ -n "${BUDDY_TEST_STREAM:-}" ]; then
+  post() { cat; echo; }
+  "stream_$BUDDY_TEST_STREAM"
+  exit 0
+fi
+
+# ------------------------------------------------------------------------ run
+(
+  if [ "$BACKEND" = opencode ]; then
+    if ! have opencode; then event buddy_error "OpenCode isn't installed yet. Install it in Buddy's Settings."; exit 0; fi
+    run_opencode | stream_opencode
+    status=${PIPESTATUS[0]}
+    if [ "$status" -ne 0 ] && [ -s "$S/opencode-session" ] && grep -q -i -E 'not found|no such|session' "$S/last-error.log" 2>/dev/null; then
+      rm -f "$S/opencode-session"   # old session is gone; retry as a new conversation
+      run_opencode | stream_opencode
+      status=${PIPESTATUS[0]}
+    fi
+    name=OpenCode
+  elif [ "$BACKEND" = agy ]; then
+    if ! have agy; then event buddy_error "Antigravity isn't installed yet. Install it in Buddy's Settings."; exit 0; fi
+    # a rule's run must get no shell, files or web; agy's allow list can't promise that yet (see Account.runsRules)
+    if [ "$DEV" = rule ]; then event buddy_error "Antigravity can't run notification rules yet. Pick another agent for this rule."; exit 0; fi
+    # the last run's raw events stay in the session folder, for checking how agy reports its steps
+    run_agy | tee "$S/agy-last.jsonl" | stream_agy
+    status=${PIPESTATUS[0]}
+    # a refusal ended its turn without a word: nudge it on once, in the same conversation
+    if [ -s "$S/agy-denied" ] && [ -s "$S/agy-conversation" ]; then
+      MSG="(From Buddy, not the user) This chat doesn't allow that: $(cat "$S/agy-denied"). Carry on with the phone \
+tools (call_mcp_tool, ServerName \"phone\") and finish the user's request."
+      run_agy | tee -a "$S/agy-last.jsonl" | stream_agy last
+      status=${PIPESTATUS[0]}
+    fi
+    if [ -s "$S/agy-conversation" ] && grep -q -i -E 'conversation.*(not found|no such|unknown)' "$S/agy-error" "$S/last-error.log" 2>/dev/null; then
+      rm -f "$S/agy-conversation"   # old conversation is gone; retry as a new one
+      run_agy | stream_agy
+      status=${PIPESTATUS[0]}
+    fi
+    # a failed turn (quota reached, …) is already in the chat from its result; agy also exits non-zero and prints
+    # the same error with raw JSON, which would show it twice
+    [ -s "$S/agy-error" ] && status=0
+    name=Antigravity
+  elif [ "$BACKEND" = grok ]; then
+    if ! have grok; then event buddy_error "Grok isn't installed yet. Install it in Buddy's Settings."; exit 0; fi
+    run_grok | stream_grok
+    status=${PIPESTATUS[0]}
+    if [ "$status" -ne 0 ] && [ -s "$S/grok-session" ] && grep -q -i -E 'session.*not found|failed to restore session' "$S/last-error.log" 2>/dev/null; then
+      rm -f "$S/grok-session"   # old session is gone; retry as a new conversation
+      run_grok | stream_grok
+      status=${PIPESTATUS[0]}
+    fi
+    # a failed turn (not signed in, …) is already in the chat from its result; grok also exits non-zero and prints
+    # the same error, which would show it twice
+    [ -s "$S/grok-error" ] && status=0
+    name=Grok
+  elif [ "$BACKEND" = gemini ]; then
+    if ! have gemini; then event buddy_error "Gemini CLI isn't installed yet. Install it in Buddy's Settings."; exit 0; fi
+    run_gemini | stream_gemini
+    status=${PIPESTATUS[0]}
+    if [ "$status" -ne 0 ] && [ -s "$S/gemini-session" ] && grep -q -i -E 'session.*(not found|no such|unknown)|could not (find|resume)' "$S/last-error.log" 2>/dev/null; then
+      rm -f "$S/gemini-session"   # old session is gone; retry as a new conversation
+      run_gemini | stream_gemini
+      status=${PIPESTATUS[0]}
+    fi
+    # a failed turn is already in the chat from its result; Gemini also exits non-zero and prints it
+    [ -s "$S/gemini-error" ] && status=0
+    name="Gemini CLI"
+  elif [ "$BACKEND" = codex ]; then
+    if ! have codex; then event buddy_error "Codex isn't installed yet. Install it in Buddy's Settings."; exit 0; fi
+    run_codex | stream_codex
+    status=${PIPESTATUS[0]}
+    if [ "$status" -ne 0 ] && [ -s "$S/codex-thread" ] && grep -q -i -E 'not found|no such|unknown (thread|session)' "$S/last-error.log" 2>/dev/null; then
+      rm -f "$S/codex-thread"   # old thread is gone; retry as a new conversation
+      run_codex | stream_codex
+      status=${PIPESTATUS[0]}
+    fi
+    name=Codex
+  else
+    if ! have claude; then event buddy_error "Claude Code isn't installed yet. Install it in Buddy's Settings."; exit 0; fi
+    run_claude | stream_claude
+    status=${PIPESTATUS[0]}
+    if [ "$status" -ne 0 ] && grep -q -i 'no conversation found' "$S/last-error.log" 2>/dev/null; then
+      rm -f "$S/claude-session"   # old session is gone; retry as a new conversation
+      run_claude | stream_claude
+      status=${PIPESTATUS[0]}
+    fi
+    name="Claude Code"
+  fi
+  if [ "$status" -ne 0 ] && [ "$status" -ne 143 ] && [ -s "$S/last-error.log" ]; then
+    event buddy_error "$name failed: $(tail -c 400 "$S/last-error.log")"
+  fi
+) &
+echo $! > "$S/pid"
+wait $! 2>/dev/null
+rm -f "$S/pid"
+event buddy_done
+\nCurrent user message:\n'
+  HISTORY="${MSG%$marker*}"
+  CURRENT="${MSG##*$marker}"
+  if [ "$HISTORY" != "$MSG" ] && [ -n "$HISTORY" ]; then
+    SUMMARY=$(model_summary "$HISTORY" 2>/dev/null) || SUMMARY=""
+    if [ -n "$SUMMARY" ]; then
+      MSG="Model-generated conversation memory (updated from the saved transcript):\n$SUMMARY\n\nRecent exact context from the transcript:\n$(printf '%s' "$HISTORY" | tail -c 12000)\n\nCurrent user message:\n$CURRENT"
+    fi
   fi
 fi
 
