@@ -273,11 +273,12 @@ model_summary() {
   if [ -s "$old_source" ] && [ -s "$S/rolling-summary.md" ]; then
     local old
     old=$(cat "$old_source")
+    previous=$(cat "$S/rolling-summary.md")
     if [[ "$source" == "$old"* ]]; then
-      previous=$(cat "$S/rolling-summary.md")
       source_delta="${source:${#old}}"
       if [ -z "$source_delta" ]; then printf '%s' "$previous"; return 0; fi
     fi
+    # If the app's bounded handoff excerpt has rolled forward, retain the old summary and fold in the new excerpt.
   fi
   while IFS= read -r chunk || [ -n "$chunk" ]; do
     [ -n "$chunk" ] || continue
