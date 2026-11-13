@@ -14,7 +14,7 @@
 #   buddy-run <token> transcript <claude|codex> <file>   last messages of a session (buddy_transcript)
 #   buddy-run <token> adopt <session> <claude|codex> <agent-session-id>  continue that session as a Buddy chat
 # Every event sent to the bubble carries "buddy_session" so the app can route it.
-HELPER_VERSION=27
+HELPER_VERSION=28
 set -u
 export PATH=$HOME/.local/bin:$HOME/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 # The claude launcher sets BUN_OPTIONS with a path relative to its folder; never inherit a stale one.
@@ -240,7 +240,7 @@ case "$CMD" in
       rm -rf "${d:?}"
     done
     exit 0 ;;
-  ask) SID=${3:-}; BACKEND=${4:-claude}; DEV=${5:-0}; MSG=${6:-}; MODEL=${7:-}; FILES=${8:-}; EFFORT=${9:-}
+  ask) SID=${3:-}; BACKEND=${4:-claude}; DEV=${5:-0}; MSG=${6:-}; MODEL=${7:-}; FILES=${8:-}; EFFORT=${9:-}; FRESH=${10:-}
     [[ "$EFFORT" =~ ^(low|medium|high|xhigh|max)$ ]] || EFFORT="" ;;
   *) echo "usage: buddy-run <token> ask|stop|delete|prune|ping ..." >&2; exit 2 ;;
 esac
@@ -258,8 +258,70 @@ fi
 svc_window() {
   jq -r --arg m "$SVCM" '.models[$m].window // 0 | select(. > 0)' "$D/providers/$SVC.json" 2>/dev/null
 }
+
+# Model-written cumulative memory for provider handoffs. The Android relay keeps the real key private
+# and enforces BestBuddy's verified-free-model restriction on every summarization request.
+model_summary() {
+  local source="$1" openai anthropic chunk previous="" response="" tmp req system prompt source_delta old_source
+  [ -n "$SVC" ] && [ -s "$D/providers/$SVC.json" ] || return 1
+  openai=$(jq -r '.openai // ""' "$D/providers/$SVC.json" 2>/dev/null)
+  anthropic=$(jq -r '.anthropic // false' "$D/providers/$SVC.json" 2>/dev/null)
+  [ -n "$openai" ] || [ "$anthropic" = true ] || return 1
+  tmp="$S/summary-response.json"; req="$S/summary-request.json"
+  old_source="$S/summary-source.txt"
+  source_delta="$source"
+  if [ -s "$old_source" ] && [ -s "$S/rolling-summary.md" ]; then
+    local old
+    old=$(cat "$old_source")
+    previous=$(cat "$S/rolling-summary.md")
+    if [[ "$source" == "$old"* ]]; then
+      source_delta="${source:${#old}}"
+      if [ -z "$source_delta" ]; then printf '%s' "$previous"; return 0; fi
+    fi
+    # If the app's bounded handoff excerpt has rolled forward, retain the old summary and fold in the new excerpt.
+  fi
+  while IFS= read -r chunk || [ -n "$chunk" ]; do
+    [ -n "$chunk" ] || continue
+    system="You maintain durable memory for a long-running assistant conversation. Update the existing cumulative summary using the new chronological transcript segment. Preserve concrete facts, preferences, project names, decisions, constraints, technical details, errors, unresolved tasks and next steps. Distinguish confirmed facts from proposals. Do not invent information. Remove repetition. Return only compact structured Markdown."
+    prompt=$(printf 'Existing cumulative summary:\n%s\n\nNew chronological transcript segment:\n%s' "${previous:-[No summary yet]}" "$chunk")
+    response=""
+    if [ -n "$openai" ]; then
+      jq -cn --arg m "$SVCM" --arg sys "$system" --arg p "$prompt" \
+        '{model:$m,temperature:0.1,max_tokens:3000,messages:[{role:"system",content:$sys},{role:"user",content:$p}]}' > "$req"
+      curl -sS -m 180 -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
+        --data-binary @"$req" "$URL/llm/$SVC/o/chat/completions" -o "$tmp" 2>/dev/null || true
+      response=$(jq -r '.choices[0].message.content // empty' "$tmp" 2>/dev/null)
+      if [ -z "$response" ]; then
+        jq -cn --arg m "$SVCM" --arg sys "$system" --arg p "$prompt" \
+          '{model:$m,max_output_tokens:3000,input:[{role:"system",content:[{type:"input_text",text:$sys}]},{role:"user",content:[{type:"input_text",text:$p}]}]}' > "$req"
+        curl -sS -m 180 -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
+          --data-binary @"$req" "$URL/llm/$SVC/o/responses" -o "$tmp" 2>/dev/null || true
+        response=$(jq -r '.output_text // ([.output[]?.content[]? | select(.type == "output_text") | .text] | join("\n"))' "$tmp" 2>/dev/null)
+      fi
+    fi
+    if [ -z "$response" ] && [ "$anthropic" = true ]; then
+      jq -cn --arg m "$SVCM" --arg sys "$system" --arg p "$prompt" \
+        '{model:$m,max_tokens:3000,temperature:0.1,system:$sys,messages:[{role:"user",content:$p}]}' > "$req"
+      curl -sS -m 180 -H "Authorization: Bearer $TOKEN" -H 'anthropic-version: 2023-06-01' \
+        -H 'Content-Type: application/json' --data-binary @"$req" \
+        "$URL/llm/$SVC/a/v1/messages" -o "$tmp" 2>/dev/null || true
+      response=$(jq -r '[.content[]? | select(.type == "text") | .text] | join("\n")' "$tmp" 2>/dev/null)
+    fi
+    [ -n "$response" ] || return 1
+    previous="$response"
+  done < <(printf '%s' "$source_delta" | fold -s -w 18000)
+  [ -n "$previous" ] || return 1
+  printf '%s\n' "$previous" > "$S/rolling-summary.md"
+  printf '%s' "$source" > "$old_source"
+  printf '%s' "$previous"
+}
+
 S=$D/sessions/$SID
 mkdir -p "$S"
+# A model handoff starts a fresh native agent session, while retaining Buddy's canonical transcript.
+if [ "${FRESH:-}" = 1 ]; then
+  rm -f "$S/claude-session" "$S/codex-thread" "$S/opencode-session" "$S/agy-conversation" "$S/grok-session" "$S/gemini-session"
+fi
 event() { jq -cn --arg type "$1" --arg text "${2:-}" --arg s "$SID" '{type:$type,text:$text,buddy_session:$s}' | post; }
 tag() { jq -c --arg s "$SID" '. + {buddy_session:$s}' 2>/dev/null; }
 
@@ -293,6 +355,23 @@ if [ -n "${FILES:-}" ]; then
 
 [The user attached $( [ ${#ATT[@]} -eq 1 ] && echo "a file" || echo "${#ATT[@]} files" ), saved on this phone. Open them with your Read tool (images show as pictures):
 $(printf -- '- %s\n' "${ATT[@]}")]"
+  fi
+fi
+
+# On a fresh provider session, replace the long raw history with a model-generated cumulative memory.
+# The current user turn remains verbatim, and the latest transcript tail is kept for exact wording.
+if [ "${FRESH:-}" = 1 ] && [ -n "$SVC" ]; then
+  marker=$'\nCurrent user message:\n'
+  HISTORY="${MSG%$marker*}"
+  CURRENT="${MSG##*$marker}"
+  if [ "$HISTORY" != "$MSG" ] && [ -n "$HISTORY" ]; then
+    event buddy_step "Updating conversation memory with the selected free model…"
+    SUMMARY=$(model_summary "$HISTORY" 2>/dev/null) || SUMMARY=""
+    if [ -n "$SUMMARY" ]; then
+      MSG=$(printf 'Model-generated conversation memory (updated from the saved transcript):\n%s\n\nRecent exact context from the transcript:\n%s\n\nCurrent user message:\n%s' "$SUMMARY" "$(printf '%s' "$HISTORY" | tail -c 12000)" "$CURRENT")
+    else
+      event buddy_step "Model summary was unavailable; continuing with the saved transcript excerpt."
+    fi
   fi
 fi
 

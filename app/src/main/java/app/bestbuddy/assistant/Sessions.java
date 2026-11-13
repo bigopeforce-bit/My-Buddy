@@ -65,6 +65,8 @@ final class Sessions {
         long ctxUsed, ctxWindow;
         /** Android closed BestBuddy while the agent was working: the chat offers to continue (see ChatHub.resume). */
         boolean interrupted;
+        /** The next user turn must rehydrate the saved transcript after a manual model/provider change. */
+        boolean handoffPending;
         /** Incognito: deleted, with what the agent kept of it, when BestBuddy starts again (see ChatHub). */
         boolean incognito;
         /** This run may end quietly (a scheduled task's "only tell me when there's news"); quietSaid: it did. Runtime. */
@@ -225,7 +227,8 @@ final class Sessions {
 
     void add(Session s, Bubble.Kind kind, String text, List<String> files) {
         s.messages.add(new Msg(kind, text, files));
-        while (s.messages.size() > MAX_MESSAGES) s.messages.remove(0);
+        // Keep the complete transcript. Trimming here silently discarded older conversation context
+        // and made it unavailable to the chat UI, backups, and later model turns.
         s.updated = System.currentTimeMillis();
         if (kind == Bubble.Kind.USER && s.title.isEmpty()) s.title = autoTitle(text, files);
         // keep most recently used first
@@ -336,7 +339,7 @@ final class Sessions {
         }
         JSONObject o = new JSONObject().put("id", s.id).put("backend", s.backend).put("title", s.title).put("model", s.model)
                 .put("effort", s.effort).put("actual_model", s.actualModel).put("ctx_used", s.ctxUsed).put("ctx_window", s.ctxWindow)
-                .put("interrupted", s.interrupted).put("incognito", s.incognito).put("dev", s.dev).put("awake", s.awake)
+                .put("interrupted", s.interrupted).put("handoff_pending", s.handoffPending).put("incognito", s.incognito).put("dev", s.dev).put("awake", s.awake)
                 .put("auto_approve", s.autoApprove).put("background", s.background)
                 .put("plan_used", s.planUsed)
                 .put("pinned", s.pinned).put("archived", s.archived).put("updated", s.updated).put("messages", msgs);
@@ -365,6 +368,7 @@ final class Sessions {
         s.ctxUsed = o.optLong("ctx_used");
         s.ctxWindow = o.optLong("ctx_window");
         s.interrupted = o.optBoolean("interrupted");
+        s.handoffPending = o.optBoolean("handoff_pending");
         s.incognito = o.optBoolean("incognito");
         // a chat from before Linux tools were per chat gets what the one switch in Settings gave every chat
         older[0] |= !o.has("dev");
