@@ -36,7 +36,7 @@ public class OnboardingActivity extends Screen implements Account.Listener {
     private int accessTries;
     private boolean stuckOpen;
     /** After Back, stay on the (possibly done) step until the user moves on themselves. */
-    private boolean noAutoAdvance;
+    private boolean noAutoAdvance;\n    private boolean showAdvancedAgents;
 
     @Override
     protected void onCreate(Bundle state) {
@@ -258,9 +258,15 @@ public class OnboardingActivity extends Screen implements Account.Listener {
         primary(getString(R.string.onboarding_get_started), v -> go(BRAIN));
     }
 
+    /**
+     * Keep first-run setup approachable: show one sensible starting choice first.
+     * The other supported agents remain available behind an explicit advanced toggle.
+     */
     private void brain() {
-        header(R.drawable.ms_forum, getString(R.string.onboarding_brain_title), getString(R.string.onboarding_brain_text), false);
-        String cur = Prefs.agents(this);
+        header(R.drawable.ms_forum, "Choose your AI assistant",
+                "Start with the recommended option. You can change assistants or connect other providers later in Settings.", false);
+
+        String selected = Prefs.agents(this);
         String[][] opts = {
                 {"opencode", "OpenCode", getString(R.string.onboarding_brain_opencode)},
                 {"gemini", "Gemini CLI", getString(R.string.onboarding_brain_gemini)},
@@ -268,55 +274,74 @@ public class OnboardingActivity extends Screen implements Account.Listener {
                 {"grok", "Grok", getString(R.string.onboarding_brain_grok)},
                 {"codex", "Codex", getString(R.string.onboarding_brain_codex)},
         };
-        for (String[] o : opts) {
-            boolean on = o[0].equals(cur);
-            LinearLayout r = row(this);
-            r.setPaddingRelative(dp(this, 14), dp(this, 14), dp(this, 14), dp(this, 14));
-            r.setBackground(outlined(this, CARD, 16, on ? ACCENT : OUTLINE, on ? 2 : 1));
-            if ("both".equals(o[0])) {
-                LinearLayout two = row(this);
-                TextView a = agentTile(this, "claude");
-                a.setLayoutParams(new LinearLayout.LayoutParams(dp(this, 28), dp(this, 40)));
-                two.addView(a);
-                TextView b = agentTile(this, "codex");
-                LinearLayout.LayoutParams bp = new LinearLayout.LayoutParams(dp(this, 28), dp(this, 40));
-                bp.setMarginStart(dp(this, 2));
-                two.addView(b, bp);
-                r.addView(two);
-            } else {
-                r.addView(agentTile(this, o[0]));
+
+        // Recommended default: retain the existing provider choice unless the user changes it.
+        LinearLayout recommended = column(this);
+        recommended.setPaddingRelative(dp(this, 16), dp(this, 16), dp(this, 16), dp(this, 16));
+        boolean recommendedOn = "opencode".equals(selected);
+        recommended.setBackground(outlined(this, CARD, 18, recommendedOn ? ACCENT : OUTLINE,
+                recommendedOn ? 2 : 1));
+        LinearLayout row = row(this);
+        row.setGravity(Gravity.CENTER_VERTICAL);
+        row.addView(agentTile(this, "opencode"));
+        LinearLayout details = column(this);
+        details.setPaddingRelative(dp(this, 12), 0, dp(this, 8), 0);
+        LinearLayout name = row(this);
+        name.addView(title(this, "OpenCode", 17));
+        TextView tag = monoText(this, "RECOMMENDED", 10, ACCENT_TEXT);
+        tag.setPaddingRelative(dp(this, 7), dp(this, 3), dp(this, 7), dp(this, 3));
+        tag.setBackground(rounded(this, ACCENT_SOFT, 6));
+        LinearLayout.LayoutParams tagLp = wrap();
+        tagLp.setMarginStart(dp(this, 8));
+        name.addView(tag, tagLp);
+        details.addView(name);
+        details.addView(text(this, "A straightforward way to start. Free model availability and usage limits depend on the provider.", 13, MUTED));
+        row.addView(details, weight1());
+        row.addView(radio(recommendedOn));
+        recommended.addView(row, full());
+        recommended.setOnClickListener(v -> selectAgent("opencode"));
+        LinearLayout.LayoutParams recommendedLp = full();
+        recommendedLp.topMargin = dp(this, 16);
+        body.addView(recommended, recommendedLp);
+
+        Button advanced = button(this, showAdvancedAgents ? "Hide other assistants" : "Choose another assistant", false);
+        LinearLayout.LayoutParams advancedLp = full();
+        advancedLp.topMargin = dp(this, 12);
+        body.addView(advanced, advancedLp);
+        advanced.setOnClickListener(v -> {
+            showAdvancedAgents = !showAdvancedAgents;
+            render();
+        });
+
+        if (showAdvancedAgents) {
+            note("These options are for users who already use another assistant. You can also change this later in Settings.");
+            for (String[] option : opts) {
+                if ("opencode".equals(option[0])) continue;
+                boolean on = option[0].equals(selected);
+                LinearLayout choice = row(this);
+                choice.setGravity(Gravity.CENTER_VERTICAL);
+                choice.setPaddingRelative(dp(this, 14), dp(this, 13), dp(this, 14), dp(this, 13));
+                choice.setBackground(outlined(this, CARD, 15, on ? ACCENT : OUTLINE, on ? 2 : 1));
+                choice.addView(agentTile(this, option[0]));
+                LinearLayout copy = column(this);
+                copy.setPaddingRelative(dp(this, 12), 0, dp(this, 8), 0);
+                copy.addView(title(this, option[1], 15));
+                copy.addView(text(this, option[2], 13, MUTED));
+                choice.addView(copy, weight1());
+                choice.addView(radio(on));
+                choice.setOnClickListener(v -> selectAgent(option[0]));
+                LinearLayout.LayoutParams choiceLp = full();
+                choiceLp.topMargin = dp(this, 8);
+                body.addView(choice, choiceLp);
             }
-            LinearLayout t = column(this);
-            t.setPaddingRelative(dp(this, 14), 0, dp(this, 8), 0);
-            LinearLayout tr = row(this);
-            tr.addView(title(this, o[1], 16));
-            if ("opencode".equals(o[0])) {
-                TextView tag = monoText(this, getString(R.string.onboarding_recommended), 11, ACCENT_TEXT);
-                tag.setPaddingRelative(dp(this, 6), dp(this, 1), dp(this, 6), dp(this, 1));
-                tag.setBackground(rounded(this, ACCENT_SOFT, 6));
-                LinearLayout.LayoutParams tp = wrap();
-                tp.setMarginStart(dp(this, 8));
-                tr.addView(tag, tp);
-            }
-            if (Account.known(o[0]) && Account.of(o[0]).freeTier()) {
-                LinearLayout.LayoutParams tp = wrap();
-                tp.setMarginStart(dp(this, 8));
-                tr.addView(freeTag(this), tp);
-            }
-            t.addView(tr);
-            t.addView(text(this, o[2], 13, MUTED));
-            r.addView(t, weight1());
-            r.addView(radio(on));
-            r.setOnClickListener(v -> {
-                Prefs.setAgents(this, o[0]);
-                Prefs.setBackend(this, Account.known(o[0]) ? o[0] : "opencode");
-                render();
-            });
-            LinearLayout.LayoutParams p = full();
-            p.topMargin = dp(this, 10);
-            body.addView(r, p);
         }
         primary(getString(R.string.onboarding_continue), v -> go(ACCESS));
+    }
+
+    private void selectAgent(String agent) {
+        Prefs.setAgents(this, agent);
+        Prefs.setBackend(this, Account.known(agent) ? agent : "opencode");
+        render();
     }
 
     private void agents(boolean ok) {
