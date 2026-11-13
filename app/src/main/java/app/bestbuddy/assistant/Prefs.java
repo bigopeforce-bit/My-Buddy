@@ -306,6 +306,14 @@ final class Prefs {
     }
 
     /** First-run guide finished (or skipped). */
+    static boolean freeLLMAPISetupPrompted(Context c) {
+        return sp(c).getBoolean("freellmapi_setup_prompted", false);
+    }
+
+    static void setFreeLLMAPISetupPrompted(Context c, boolean prompted) {
+        sp(c).edit().putBoolean("freellmapi_setup_prompted", prompted).apply();
+    }
+
     static boolean onboarded(Context c) {
         return sp(c).getBoolean("onboarded", false);
     }
