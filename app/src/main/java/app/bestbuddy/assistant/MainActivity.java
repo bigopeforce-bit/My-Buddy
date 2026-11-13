@@ -91,6 +91,7 @@ public class MainActivity extends Screen implements ChatHub.Listener, Account.Li
         hub.addListener(this);
         Waiting.listener = waitingChanged;
         render();
+        list.post(this::maybePromptFreeLLMAPISetup);
         Account.addListener(this);
         Account.CLAUDE.refresh(this);
         Account.CODEX.refresh(this);
@@ -98,6 +99,25 @@ public class MainActivity extends Screen implements ChatHub.Listener, Account.Li
         Account.AGY.refresh(this);
         Account.GROK.refresh(this);
         Account.GEMINI.refresh(this);
+    }
+
+    /** Offer secure FreeLLMAPI setup once after the first-run guide; the key is entered by the user,
+     * then stored only through Secrets (AES-GCM with an Android Keystore key). */
+    private void maybePromptFreeLLMAPISetup() {
+        if (!Prefs.onboarded(this) || Prefs.freeLLMAPISetupPrompted(this) || isFinishing()) return;
+        String saved = Secrets.get(this, Providers.secretName("freellmapi"));
+        if (saved != null && !saved.isEmpty()) {
+            Prefs.setFreeLLMAPISetupPrompted(this, true);
+            return;
+        }
+        Prefs.setFreeLLMAPISetupPrompted(this, true);
+        new android.app.AlertDialog.Builder(this)
+                .setTitle("Connect FreeLLMAPI")
+                .setMessage("Connect your unified FreeLLMAPI key to use the free-model gateway. Paste it once; BestBuddy stores it encrypted with Android Keystore. You can replace it later from the FreeLLMAPI settings screen.")
+                .setPositiveButton("Set up now", (dialog, which) ->
+                        startActivity(new Intent(this, FreeLLMAPIActivity.class)))
+                .setNegativeButton("Not now", null)
+                .show();
     }
 
     private final Runnable waitingChanged = this::render;
