@@ -193,8 +193,10 @@ final class Models {
             }
             for (Providers.P q : Providers.enabled()) {
                 if (q.id.equals(p.id) || !q.fits(backend)) continue;
-                java.util.List<String[]> m = providerModels(Providers.apiId(q.id));
-                if (!m.isEmpty()) return Providers.ref(q, m.get(0)[0]);
+                for (String[] candidate : providerModels(Providers.apiId(q.id))) {
+                    String ref = Providers.ref(q, candidate[0]);
+                    if (tried == null || !tried.contains(ref)) return ref;
+                }
             }
             return "";
         }
